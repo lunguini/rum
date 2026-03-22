@@ -22,8 +22,14 @@ import os.log
 public class Wine {
     /// URL to the installed `DXVK` folder
     private static let dxvkFolder: URL = WhiskyWineInstaller.libraryFolder.appending(path: "DXVK")
-    /// Path to the `wine64` binary
-    public static let wineBinary: URL = WhiskyWineInstaller.binFolder.appending(path: "wine64")
+    /// Path to the `wine` binary (Wine 11+ uses a unified binary; fall back to wine64 for older builds)
+    public static var wineBinary: URL {
+        let unified = WhiskyWineInstaller.binFolder.appending(path: "wine")
+        if FileManager.default.fileExists(atPath: unified.path) {
+            return unified
+        }
+        return WhiskyWineInstaller.binFolder.appending(path: "wine64")
+    }
     /// Parth to the `wineserver` binary
     private static let wineserverBinary: URL = WhiskyWineInstaller.binFolder.appending(path: "wineserver")
 
@@ -98,17 +104,22 @@ public class Wine {
 
     /// Execute a `wine start /unix {url}` command returning the output result
     public static func runProgram(
-        at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:]
+        at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:],
+        onStarted: (() -> Void)? = nil
     ) async throws {
         if bottle.settings.dxvk {
             try enableDXVK(bottle: bottle)
         }
 
-        for await _ in try Self.runWineProcess(
+        for await output in try Self.runWineProcess(
             name: url.lastPathComponent,
             args: ["start", "/unix", url.path(percentEncoded: false)] + args,
             bottle: bottle, environment: environment
-        ) { }
+        ) {
+            if case .started = output {
+                onStarted?()
+            }
+        }
     }
 
     public static func generateRunCommand(
@@ -124,19 +135,10 @@ public class Wine {
     }
 
     public static func generateTerminalEnvironmentCommand(bottle: Bottle) -> String {
+        let wineName = wineBinary.lastPathComponent
         var cmd = """
         export PATH=\"\(WhiskyWineInstaller.binFolder.path):$PATH\"
-        export WINE=\"wine64\"
-        alias wine=\"wine64\"
-        alias winecfg=\"wine64 winecfg\"
-        alias msiexec=\"wine64 msiexec\"
-        alias regedit=\"wine64 regedit\"
-        alias regsvr32=\"wine64 regsvr32\"
-        alias wineboot=\"wine64 wineboot\"
-        alias wineconsole=\"wine64 wineconsole\"
-        alias winedbg=\"wine64 winedbg\"
-        alias winefile=\"wine64 winefile\"
-        alias winepath=\"wine64 winepath\"
+        export WINE=\"\(wineName)\"
         """
 
         let env = constructWineEnvironment(for: bottle, environment: constructWineEnvironment(for: bottle))
@@ -196,9 +198,9 @@ public class Wine {
         var output = try await runWine(["--version"], bottle: nil)
         output.replace("wine-", with: "")
 
-        // Deal with WineCX version names
-        if let index = output.firstIndex(where: { $0.isWhitespace }) {
-            return String(output.prefix(upTo: index))
+        // Strip any extra info after version (e.g., staging suffix, WineCX names)
+        if let index = output.firstIndex(where: { $0.isWhitespace || $0 == "(" }) {
+            output = String(output.prefix(upTo: index))
         }
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }

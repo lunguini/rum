@@ -90,7 +90,7 @@ public enum EnhancedSync: Codable, Equatable {
 }
 
 public struct BottleWineConfig: Codable, Equatable {
-    static let defaultWineVersion = SemanticVersion(7, 7, 0)
+    static let defaultWineVersion = SemanticVersion(11, 0, 0)
     var wineVersion: SemanticVersion = Self.defaultWineVersion
     var windowsVersion: WinVersion = .win10
     var enhancedSync: EnhancedSync = .msync
@@ -129,7 +129,7 @@ public enum DXVKHUD: Codable, Equatable {
 }
 
 public struct BottleDXVKConfig: Codable, Equatable {
-    var dxvk: Bool = false
+    var dxvk: Bool = true
     var dxvkAsync: Bool = true
     var dxvkHud: DXVKHUD = .off
 
@@ -137,7 +137,7 @@ public struct BottleDXVKConfig: Codable, Equatable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.dxvk = try container.decodeIfPresent(Bool.self, forKey: .dxvk) ?? false
+        self.dxvk = try container.decodeIfPresent(Bool.self, forKey: .dxvk) ?? true
         self.dxvkAsync = try container.decodeIfPresent(Bool.self, forKey: .dxvkAsync) ?? true
         self.dxvkHud = try container.decodeIfPresent(DXVKHUD.self, forKey: .dxvkHud) ?? .off
     }

@@ -18,7 +18,6 @@
 
 import Foundation
 import os.log
-import SemanticVersion
 
 extension FileHandle {
     func extract<T>(_ type: T.Type, offset: UInt64 = 0) -> T? {
@@ -48,7 +47,7 @@ extension FileHandle {
         var header = String()
         let macOSVersion = ProcessInfo.processInfo.operatingSystemVersion
 
-        header += "Whisky Version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "")\n"
+        header += "Rum Version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "")\n"
         header += "Date: \(ISO8601DateFormatter().string(from: Date.now))\n"
         header += "macOS Version: \(macOSVersion.majorVersion).\(macOSVersion.minorVersion).\(macOSVersion.patchVersion)\n\n"
         write(line: header)
@@ -74,8 +73,8 @@ extension FileHandle {
         header += "Bottle Name: \(bottle.settings.name)\n"
         header += "Bottle URL: \(bottle.url.path)\n\n"
 
-        if let version = WhiskyWineInstaller.whiskyWineVersion() {
-            header += "WhiskyWine Version: \(version.major).\(version.minor).\(version.patch)\n"
+        if let version = WhiskyWineInstaller.installedWineVersion() {
+            header += "Wine Version: \(version)\n"
         }
         header += "Windows Version: \(bottle.settings.windowsVersion)\n"
         header += "Enhanced Sync: \(bottle.settings.enhancedSync)\n\n"
