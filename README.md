@@ -1,6 +1,8 @@
 <div align="center">
 
-  # Rum 🍹
+<img src="./images/logo.png" alt="gocker logo" width="256">
+
+  # Rum 
   *Wine but a bit sweeter*
 
   [![](https://img.shields.io/github/actions/workflow/status/adrianlungu/rum/SwiftLint.yml?style=for-the-badge)](https://github.com/adrianlungu/rum)
