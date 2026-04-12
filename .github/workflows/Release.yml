@@ -31,11 +31,13 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Export
+      - name: Export and Sign
         run: |
           mkdir -p ${{ runner.temp }}/export
           cp -R ${{ runner.temp }}/Rum.xcarchive/Products/Applications/Rum.app \
             ${{ runner.temp }}/export/Rum.app
+          # Ad-hoc sign so macOS doesn't treat it as damaged
+          codesign --force --deep --sign - ${{ runner.temp }}/export/Rum.app
 
       - name: Zip
         run: |

@@ -57,18 +57,26 @@ public extension Process {
 
             continuation.yield(.started(self))
 
-            pipe.fileHandleForReading.readabilityHandler = { pipe in
-                guard let line = pipe.nextLine() else { return }
+            pipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
+                    return
+                }
+                guard let line = String(data: data, encoding: .utf8), !line.isEmpty else { return }
                 continuation.yield(.message(line))
-                guard !line.isEmpty else { return }
                 Logger.wineKit.info("\(line, privacy: .public)")
                 fileHandle?.write(line: line)
             }
 
-            errorPipe.fileHandleForReading.readabilityHandler = { pipe in
-                guard let line = pipe.nextLine() else { return }
+            errorPipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
+                    return
+                }
+                guard let line = String(data: data, encoding: .utf8), !line.isEmpty else { return }
                 continuation.yield(.error(line))
-                guard !line.isEmpty else { return }
                 Logger.wineKit.warning("\(line, privacy: .public)")
                 fileHandle?.write(line: line)
             }
@@ -119,13 +127,3 @@ public extension Process {
     }
 }
 
-extension FileHandle {
-    func nextLine() -> String? {
-        guard let line = String(data: availableData, encoding: .utf8) else { return nil }
-        if !line.isEmpty {
-            return line
-        } else {
-            return nil
-        }
-    }
-}
