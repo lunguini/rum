@@ -77,7 +77,11 @@ struct ProgramView: View {
                 }
                 Button("button.run") {
                     programLoading = true
-                    program.run()
+                    program.run {
+                        Task { @MainActor in programLoading = false }
+                    } onFinished: {
+                        Task { @MainActor in programLoading = false }
+                    }
                 }
                 .disabled(programLoading)
                 if programLoading {

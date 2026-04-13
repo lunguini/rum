@@ -18,32 +18,59 @@
 
 import Foundation
 import AppKit
+import UserNotifications
 import os.log
 
 extension Program {
-    public func run() {
+    public func run(onStarted: (@Sendable () -> Void)? = nil, onFinished: (@Sendable () -> Void)? = nil) {
         if NSEvent.modifierFlags.contains(.shift) {
             self.runInTerminal()
         } else {
-            self.runInWine()
+            self.runInWine(onStarted: onStarted, onFinished: onFinished)
         }
     }
 
-    func runInWine() {
+    func runInWine(onStarted: (@Sendable () -> Void)? = nil, onFinished: (@Sendable () -> Void)? = nil) {
         let arguments = settings.arguments.split { $0.isWhitespace }.map(String.init)
         let environment = generateEnvironment()
+        let programName = self.url.lastPathComponent
+        let notificationID = "launch-\(UUID().uuidString)"
+
+        Self.postLaunchNotification(programName: programName, identifier: notificationID)
+        let dockBounce = NSApp.requestUserAttention(.informationalRequest)
 
         Task.detached(priority: .userInitiated) {
             do {
                 try await Wine.runProgram(
-                    at: self.url, args: arguments, bottle: self.bottle, environment: environment
+                    at: self.url, args: arguments, bottle: self.bottle, environment: environment,
+                    onStarted: {
+                        Self.removeLaunchNotification(identifier: notificationID)
+                        NSApp.cancelUserAttentionRequest(dockBounce)
+                        onStarted?()
+                    }
                 )
             } catch {
+                Self.removeLaunchNotification(identifier: notificationID)
+                NSApp.cancelUserAttentionRequest(dockBounce)
                 await MainActor.run {
                     self.showRunError(message: error.localizedDescription)
                 }
             }
+            onFinished?()
         }
+    }
+
+    private static func postLaunchNotification(programName: String, identifier: String) {
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "notification.launching.title")
+        content.body = String(localized: "notification.launching.body \(programName)")
+
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    private static func removeLaunchNotification(identifier: String) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [identifier])
     }
 
     public func generateTerminalCommand() -> String {
