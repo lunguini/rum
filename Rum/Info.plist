@@ -53,10 +53,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>SUFeedURL</key>
-	<string>https://github.com/adrianlungu/rum/releases/latest/download/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>tnZFAvPUfCpM7Tr7Sx5gKRm6BUQQ6htJQeOMP44evms=</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

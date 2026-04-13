@@ -5,6 +5,7 @@
 .DS_Store
 .idea/
 .claude/
+.ai/
 
 ## User settings
 xcuserdata/
