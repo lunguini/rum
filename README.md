@@ -21,7 +21,7 @@ Rum provides a clean and easy to use graphical wrapper for Wine built in native 
 ### Homebrew
 
 ```bash
-brew tap adrianlungu/tap
+brew tap lunguini/tap
 brew install --cask rum
 ```
 

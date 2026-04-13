@@ -49,3 +49,67 @@ jobs:
         with:
           files: ${{ runner.temp }}/export/Rum.zip
           generate_release_notes: true
+
+      - name: Update Homebrew Cask
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA256=$(shasum -a 256 ${{ runner.temp }}/export/Rum.zip | awk '{print $1}')
+
+          python3 - "$VERSION" "$SHA256" "$HOMEBREW_TAP_TOKEN" <<'SCRIPT'
+          import sys, json, base64, urllib.request
+
+          version, sha256, token = sys.argv[1], sys.argv[2], sys.argv[3]
+          repo = "lunguini/homebrew-tap"
+          path = "Casks/rum.rb"
+          api = f"https://api.github.com/repos/{repo}/contents/{path}"
+          headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+
+          cask = f'''cask "rum" do
+          \tversion "{version}"
+          \tsha256 "{sha256}"
+
+          \turl "https://github.com/adrianlungu/rum/releases/download/v#{{version}}/Rum.zip"
+          \tname "Rum"
+          \tdesc "Wine wrapper for running Windows apps on macOS"
+          \thomepage "https://github.com/adrianlungu/rum"
+
+          \tdepends_on macos: ">= :sequoia"
+          \tdepends_on arch: :arm64
+
+          \tapp "Rum.app"
+
+          \tpostflight do
+              system_command "/usr/bin/xattr",
+                             args: ["-cr", "#{{appdir}}/Rum.app"]
+            end
+
+          \tzap trash: [
+          \t\t"~/Library/Application Support/com.adrianlungu.rum",
+          \t\t"~/Library/Containers/com.adrianlungu.rum",
+          \t\t"~/Library/Preferences/com.adrianlungu.rum.plist",
+          \t]
+          end
+          '''
+
+          # Get current file SHA (if it exists)
+          file_sha = None
+          try:
+              req = urllib.request.Request(api, headers=headers)
+              with urllib.request.urlopen(req) as resp:
+                  file_sha = json.loads(resp.read()).get("sha")
+          except urllib.error.HTTPError as e:
+              if e.code != 404:
+                  raise
+
+          # Push updated cask (omit sha to create, include to update)
+          content = base64.b64encode(cask.encode()).decode()
+          body = {"message": f"Update rum to {version}", "content": content}
+          if file_sha:
+              body["sha"] = file_sha
+          payload = json.dumps(body).encode()
+          req = urllib.request.Request(api, data=payload, headers=headers, method="PUT")
+          with urllib.request.urlopen(req) as resp:
+              print(f"Updated cask to {version}: {resp.status}")
+          SCRIPT

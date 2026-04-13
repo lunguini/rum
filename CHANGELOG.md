@@ -6,6 +6,7 @@
 
 - Fixed high CPU usage (99% single core) after launching a Wine application via the Run button
 - Fixed ad-hoc code signing in release workflow so macOS doesn't treat exported app as damaged
+- Automated Homebrew cask updates in the release workflow — tap moved to `lunguini/tap`
 
 ## 1.0.1
 
