@@ -19,11 +19,12 @@ xcodebuild archive -scheme Whisky -configuration Release
 1. Run `swiftlint --strict` locally and fix any issues
 2. Verify the project builds in Xcode
 3. Update CHANGELOG.md with the new version and changes
-4. Update version numbers as needed
-5. Commit, tag with `vX.Y.Z`, and push — the Release workflow handles the rest:
-   - Builds and archives the app
+4. Commit, tag with `vX.Y.Z`, and push — the Release workflow handles the rest:
+   - Builds and archives the app (version injected from tag automatically)
    - Creates the GitHub release with auto-generated notes
    - Updates the Homebrew cask in `lunguini/homebrew-tap`
+
+**Important:** Never amend commits that have been pushed. If a fix is needed after pushing, make a new commit. To retag: `git tag -f vX.Y.Z && git push origin :vX.Y.Z && git push origin vX.Y.Z`.
 
 ## Project Structure
 
