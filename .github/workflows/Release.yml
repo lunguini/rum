@@ -26,13 +26,15 @@ jobs:
 
       - name: Build
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           xcodebuild archive \
             -scheme Whisky \
             -archivePath ${{ runner.temp }}/Rum.xcarchive \
             -configuration Release \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="$VERSION"
 
       - name: Export and Sign
         run: |

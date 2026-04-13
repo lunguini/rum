@@ -10,6 +10,8 @@
 - Updated default Wine version for new bottles to 11.6.0
 - Removed standalone SwiftLint workflow — already runs as an Xcode build phase
 - Restored SwiftLint install in release workflow (required by Xcode build phase)
+- Fixed app version not matching git tag — release workflow now injects version from tag
+- Added `contents: write` permission to release workflow for GitHub release creation
 
 ## 1.0.2
 
