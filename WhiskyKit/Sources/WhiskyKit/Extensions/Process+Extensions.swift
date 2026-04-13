@@ -44,14 +44,8 @@ public extension Process {
 
         return AsyncStream<ProcessOutput> { continuation in
             continuation.onTermination = { termination in
-                switch termination {
-                case .finished:
-                    break
-                case .cancelled:
-                    guard self.isRunning else { return }
+                if case .cancelled = termination, self.isRunning {
                     self.terminate()
-                @unknown default:
-                    break
                 }
             }
 
@@ -126,4 +120,3 @@ public extension Process {
         }
     }
 }
-

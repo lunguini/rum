@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.3
+
+### Fixes
+
+- Fixed `.exe` files not appearing in Finder's "Open With" menu — added UTImportedTypeDeclarations for `com.microsoft.windows-executable`
+- Fixed SwiftLint violations in Process+Extensions.swift
+- Fixed SwiftLint config not excluding `WhiskyKit/.build/` dependency checkouts
+- Updated default Wine version for new bottles to 11.6.0
+- Removed redundant SwiftLint step from release workflow
+
 ## 1.0.2
 
 ### Fixes
