@@ -5,7 +5,7 @@
   # Rum 
   *Wine but a bit sweeter*
 
-  [![](https://img.shields.io/github/actions/workflow/status/adrianlungu/rum/SwiftLint.yml?style=for-the-badge)](https://github.com/adrianlungu/rum)
+
 </div>
 
 Rum is a fork of [Whisky](https://github.com/Whisky-App/Whisky), updated to use [Gcenx's Wine Staging](https://github.com/Gcenx/macOS_Wine_builds) builds and [DXVK-macOS](https://github.com/Gcenx/DXVK-macOS) for DirectX translation.
