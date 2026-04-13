@@ -8,7 +8,8 @@
 - Fixed SwiftLint violations in Process+Extensions.swift
 - Fixed SwiftLint config not excluding `WhiskyKit/.build/` dependency checkouts
 - Updated default Wine version for new bottles to 11.6.0
-- Removed redundant SwiftLint step from release workflow
+- Removed standalone SwiftLint workflow — already runs as an Xcode build phase
+- Restored SwiftLint install in release workflow (required by Xcode build phase)
 
 ## 1.0.2
 
