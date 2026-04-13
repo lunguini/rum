@@ -18,6 +18,9 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
       - name: Build
         run: |
           xcodebuild archive \

@@ -12,6 +12,8 @@ swiftlint --strict
 xcodebuild archive -scheme Whisky -configuration Release
 ```
 
+**Important:** SwiftLint must be installed for the Xcode build to succeed — the Rum target has a SwiftLint build phase (`Script-6E50D98129CD0EAF008C39F6`) that runs during every build. Do not remove `brew install swiftlint` from the Release workflow.
+
 ## Release Checklist
 
 1. Run `swiftlint --strict` locally and fix any issues
