@@ -22,7 +22,6 @@ import UserNotifications
 import os.log
 
 extension Program {
-    @MainActor
     public func run(onStarted: (@Sendable () -> Void)? = nil, onFinished: (@Sendable () -> Void)? = nil) {
         if NSEvent.modifierFlags.contains(.shift) {
             self.runInTerminal()
@@ -31,7 +30,6 @@ extension Program {
         }
     }
 
-    @MainActor
     func runInWine(onStarted: (@Sendable () -> Void)? = nil, onFinished: (@Sendable () -> Void)? = nil) {
         let arguments = settings.arguments.split { $0.isWhitespace }.map(String.init)
         let environment = generateEnvironment()
@@ -39,7 +37,6 @@ extension Program {
         let notificationID = "launch-\(UUID().uuidString)"
 
         Self.postLaunchNotification(programName: programName, identifier: notificationID)
-        let dockBounce = NSApp.requestUserAttention(.informationalRequest)
 
         Task.detached(priority: .userInitiated) {
             do {
@@ -47,9 +44,6 @@ extension Program {
                     at: self.url, args: arguments, bottle: self.bottle, environment: environment,
                     onStarted: {
                         Self.removeLaunchNotification(identifier: notificationID)
-                        DispatchQueue.main.async {
-                            NSApp.cancelUserAttentionRequest(dockBounce)
-                        }
                         onStarted?()
                     }
                 )
@@ -57,7 +51,6 @@ extension Program {
                 Self.removeLaunchNotification(identifier: notificationID)
                 let errorMessage = error.localizedDescription
                 DispatchQueue.main.async {
-                    NSApp.cancelUserAttentionRequest(dockBounce)
                     self.showRunError(message: errorMessage)
                 }
             }
