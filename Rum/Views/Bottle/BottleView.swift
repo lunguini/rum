@@ -24,6 +24,7 @@ enum BottleStage {
     case config
     case programs
     case processes
+    case history
 }
 
 struct BottleView: View {
@@ -53,9 +54,9 @@ struct BottleView: View {
                     NavigationLink(value: BottleStage.config) {
                         Label("tab.config", systemImage: "gearshape")
                     }
-//                    NavigationLink(value: BottleStage.processes) {
-//                        Label("tab.processes", systemImage: "hockey.puck.circle")
-//                    }
+                    NavigationLink(value: BottleStage.history) {
+                        Label("tab.history", systemImage: "clock.arrow.circlepath")
+                    }
                 }
                 .formStyle(.grouped)
                 .scrollDisabled(true)
@@ -84,6 +85,8 @@ struct BottleView: View {
                         panel.begin { result in
                             guard result == .OK, let url = panel.urls.first else { return }
                             launchingCount += 1
+                            bottle.recordRun(url: url, name: url.lastPathComponent)
+                            bottle.runningPrograms.insert(url)
                             Task(priority: .userInitiated) {
                                 do {
                                     if url.pathExtension == "bat" {
@@ -100,6 +103,7 @@ struct BottleView: View {
                                     print("Failed to run program: \(error)")
                                     await MainActor.run { launchingCount -= 1 }
                                 }
+                                await MainActor.run { bottle.runningPrograms.remove(url) }
                                 updateStartMenu()
                             }
                         }
@@ -137,6 +141,8 @@ struct BottleView: View {
                     )
                 case .processes:
                     RunningProcessesView(bottle: bottle)
+                case .history:
+                    RunHistoryView(bottle: bottle)
                 }
             }
             .navigationDestination(for: Program.self) { program in

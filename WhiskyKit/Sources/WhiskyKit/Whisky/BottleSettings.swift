@@ -44,10 +44,23 @@ public struct PinnedProgram: Codable, Hashable, Equatable {
     }
 }
 
+public struct RunHistoryEntry: Codable, Hashable, Equatable {
+    public var name: String
+    public var url: URL
+    public var lastRun: Date
+
+    public init(name: String, url: URL) {
+        self.name = name
+        self.url = url
+        self.lastRun = Date()
+    }
+}
+
 public struct BottleInfo: Codable, Equatable {
     var name: String = "Bottle"
     var pins: [PinnedProgram] = []
     var blocklist: [URL] = []
+    var runHistory: [RunHistoryEntry] = []
 
     public init() {}
 
@@ -56,6 +69,7 @@ public struct BottleInfo: Codable, Equatable {
         self.name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Bottle"
         self.pins = try container.decodeIfPresent([PinnedProgram].self, forKey: .pins) ?? []
         self.blocklist = try container.decodeIfPresent([URL].self, forKey: .blocklist) ?? []
+        self.runHistory = try container.decodeIfPresent([RunHistoryEntry].self, forKey: .runHistory) ?? []
     }
 }
 
@@ -203,6 +217,12 @@ public struct BottleSettings: Codable, Equatable {
     public var blocklist: [URL] {
         get { return info.blocklist }
         set { info.blocklist = newValue }
+    }
+
+    /// The run history for this bottle
+    public var runHistory: [RunHistoryEntry] {
+        get { return info.runHistory }
+        set { info.runHistory = newValue }
     }
 
     public var enhancedSync: EnhancedSync {

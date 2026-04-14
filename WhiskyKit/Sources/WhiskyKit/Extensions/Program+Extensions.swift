@@ -32,6 +32,11 @@ extension Program {
     func runInWine(onStarted: (@Sendable () -> Void)? = nil, onFinished: (@Sendable () -> Void)? = nil) {
         let arguments = settings.arguments.split { $0.isWhitespace }.map(String.init)
         let environment = generateEnvironment()
+        let programURL = self.url
+        let programName = self.name
+
+        self.bottle.recordRun(url: programURL, name: programName)
+        DispatchQueue.main.async { self.bottle.runningPrograms.insert(programURL) }
 
         Task.detached(priority: .userInitiated) {
             do {
@@ -45,6 +50,7 @@ extension Program {
                     self.showRunError(message: errorMessage)
                 }
             }
+            DispatchQueue.main.async { self.bottle.runningPrograms.remove(programURL) }
             onFinished?()
         }
     }

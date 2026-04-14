@@ -29,6 +29,7 @@ public final class Bottle: ObservableObject, Equatable, Hashable, Identifiable, 
         didSet { saveSettings() }
     }
     @Published public var programs: [Program] = []
+    @Published public var runningPrograms: Set<URL> = []
     @Published public var inFlight: Bool = false
     public var isAvailable: Bool = false
 
@@ -84,6 +85,14 @@ public final class Bottle: ObservableObject, Equatable, Hashable, Identifiable, 
             Logger.wineKit.error(
                 "Failed to encode settings for bottle `\(self.metadataURL.path(percentEncoded: false))`: \(error)"
             )
+        }
+    }
+
+    public func recordRun(url: URL, name: String) {
+        if let index = settings.runHistory.firstIndex(where: { $0.url == url }) {
+            settings.runHistory[index].lastRun = Date()
+        } else {
+            settings.runHistory.append(RunHistoryEntry(name: name, url: url))
         }
     }
 
