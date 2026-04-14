@@ -51,8 +51,8 @@ extension Program {
                 )
             } catch {
                 Self.removeLaunchNotification(identifier: notificationID)
-                NSApp.cancelUserAttentionRequest(dockBounce)
                 await MainActor.run {
+                    NSApp.cancelUserAttentionRequest(dockBounce)
                     self.showRunError(message: error.localizedDescription)
                 }
             }
