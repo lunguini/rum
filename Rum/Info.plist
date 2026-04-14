@@ -53,6 +53,12 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Rum needs access to run Windows executables located in your Downloads folder.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Rum needs access to run Windows executables located on your Desktop.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Rum needs access to run Windows executables located in your Documents folder.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
