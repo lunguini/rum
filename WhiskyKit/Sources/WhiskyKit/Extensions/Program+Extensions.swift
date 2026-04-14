@@ -30,6 +30,7 @@ extension Program {
         }
     }
 
+    @MainActor
     func runInWine(onStarted: (@Sendable () -> Void)? = nil, onFinished: (@Sendable () -> Void)? = nil) {
         let arguments = settings.arguments.split { $0.isWhitespace }.map(String.init)
         let environment = generateEnvironment()
@@ -45,7 +46,9 @@ extension Program {
                     at: self.url, args: arguments, bottle: self.bottle, environment: environment,
                     onStarted: {
                         Self.removeLaunchNotification(identifier: notificationID)
-                        NSApp.cancelUserAttentionRequest(dockBounce)
+                        DispatchQueue.main.async {
+                            NSApp.cancelUserAttentionRequest(dockBounce)
+                        }
                         onStarted?()
                     }
                 )
