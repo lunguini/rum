@@ -55,9 +55,10 @@ extension Program {
                 )
             } catch {
                 Self.removeLaunchNotification(identifier: notificationID)
-                await MainActor.run {
+                let errorMessage = error.localizedDescription
+                DispatchQueue.main.async {
                     NSApp.cancelUserAttentionRequest(dockBounce)
-                    self.showRunError(message: error.localizedDescription)
+                    self.showRunError(message: errorMessage)
                 }
             }
             onFinished?()
@@ -114,6 +115,10 @@ extension Program {
         + message
         alert.alertStyle = .critical
         alert.addButton(withTitle: String(localized: "button.ok"))
-        alert.runModal()
+        if let window = NSApp.keyWindow {
+            alert.beginSheetModal(for: window)
+        } else {
+            alert.runModal()
+        }
     }
 }
