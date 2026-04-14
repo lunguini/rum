@@ -22,6 +22,7 @@ import UserNotifications
 import os.log
 
 extension Program {
+    @MainActor
     public func run(onStarted: (@Sendable () -> Void)? = nil, onFinished: (@Sendable () -> Void)? = nil) {
         if NSEvent.modifierFlags.contains(.shift) {
             self.runInTerminal()
