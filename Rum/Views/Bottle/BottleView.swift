@@ -35,6 +35,10 @@ struct BottleView: View {
 
     private let gridLayout = [GridItem(.adaptive(minimum: 100, maximum: .infinity))]
 
+    private var sortedHistory: [RunHistoryEntry] {
+        bottle.settings.runHistory.sorted { $0.lastRun > $1.lastRun }
+    }
+
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
@@ -47,22 +51,53 @@ struct BottleView: View {
                     PinAddView(bottle: bottle)
                 }
                 .padding()
-                Form {
-                    NavigationLink(value: BottleStage.programs) {
-                        Label("tab.programs", systemImage: "list.bullet")
+                if !sortedHistory.isEmpty {
+                    Form {
+                        Section("Run History") {
+                            ForEach(sortedHistory, id: \.self) { entry in
+                                HStack {
+                                    if bottle.runningPrograms.contains(entry.url) {
+                                        Circle()
+                                            .fill(.green)
+                                            .frame(width: 8, height: 8)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(entry.name)
+                                            .font(.body)
+                                        Text(entry.lastRun, style: .relative)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Button {
+                                        let program = Program(url: entry.url, bottle: bottle)
+                                        program.run()
+                                    } label: {
+                                        Image(systemName: "play.fill")
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(.secondary)
+                                }
+                                .contextMenu {
+                                    Button("history.remove", role: .destructive) {
+                                        bottle.settings.runHistory.removeAll { $0.url == entry.url }
+                                    }
+                                }
+                            }
+                        }
                     }
-                    NavigationLink(value: BottleStage.config) {
-                        Label("tab.config", systemImage: "gearshape")
-                    }
-                    NavigationLink(value: BottleStage.history) {
-                        Label("tab.history", systemImage: "clock.arrow.circlepath")
-                    }
+                    .formStyle(.grouped)
+                    .scrollDisabled(true)
                 }
-                .formStyle(.grouped)
-                .scrollDisabled(true)
             }
             .bottomBar {
                 HStack {
+                    Button("tab.programs") {
+                        path.append(BottleStage.programs)
+                    }
+                    Button("tab.config") {
+                        path.append(BottleStage.config)
+                    }
                     Spacer()
                     Button("button.cDrive") {
                         bottle.openCDrive()
@@ -128,7 +163,6 @@ struct BottleView: View {
             }
             .onChange(of: bottle.settings) { oldValue, newValue in
                 guard oldValue != newValue else { return }
-                // Trigger a reload
                 BottleVM.shared.bottles = BottleVM.shared.bottles
             }
             .navigationDestination(for: BottleStage.self) { stage in
@@ -157,7 +191,6 @@ struct BottleView: View {
         let startMenuPrograms = bottle.getStartMenuPrograms()
         for startMenuProgram in startMenuPrograms {
             for program in bottle.programs where
-            // For some godforsaken reason "foo/bar" != "foo/Bar" so...
             program.url.path().caseInsensitiveCompare(startMenuProgram.url.path()) == .orderedSame {
                 program.pinned = true
                 guard !bottle.settings.pins.contains(where: { $0.url == program.url }) else { return }
