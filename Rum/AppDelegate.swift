@@ -18,9 +18,8 @@
 
 import Foundation
 import SwiftUI
-import UserNotifications
 
-class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate {
     @AppStorage("hasShownMoveToApplicationsAlert") private var hasShownMoveToApplicationsAlert = false
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -34,10 +33,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let center = UNUserNotificationCenter.current()
-        center.delegate = self
-        center.requestAuthorization(options: [.alert]) { _, _ in }
-
         if !hasShownMoveToApplicationsAlert && !AppDelegate.insideAppsFolder {
             DispatchQueue.main.asyncAfter(deadline: .now()) {
                 NSApp.activate(ignoringOtherApps: true)
@@ -45,13 +40,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 self.hasShownMoveToApplicationsAlert = true
             }
         }
-    }
-
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        return [.banner]
     }
 
     func applicationWillTerminate(_ notification: Notification) {

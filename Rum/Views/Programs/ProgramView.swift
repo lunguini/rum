@@ -28,90 +28,107 @@ struct ProgramView: View {
     @AppStorage("envArgsSectionExpanded") private var envArgsSectionExpanded: Bool = true
 
     var body: some View {
-        Form {
-            Section("program.config", isExpanded: $configSectionExpanded) {
-                Picker("locale.title", selection: $program.settings.locale) {
-                    ForEach(Locales.allCases, id: \.self) { locale in
-                        Text(locale.pretty()).id(locale)
-                    }
+        VStack(spacing: 0) {
+            if programLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("program.launching \(program.name)")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
-                VStack {
-                    HStack {
-                        Text("program.args")
-                        Spacer()
-                    }
-                    TextField("program.args", text: $program.settings.arguments)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.body, design: .monospaced))
-                        .labelsHidden()
-                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
             }
-            EnvironmentArgView(program: program, isExpanded: $envArgsSectionExpanded)
-        }
-        .bottomBar {
-            HStack {
-                Spacer()
-                Button("button.showInFinder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([program.url])
+            Form {
+                Section("program.config", isExpanded: $configSectionExpanded) {
+                    Picker("locale.title", selection: $program.settings.locale) {
+                        ForEach(Locales.allCases, id: \.self) { locale in
+                            Text(locale.pretty()).id(locale)
+                        }
+                    }
+                    VStack {
+                        HStack {
+                            Text("program.args")
+                            Spacer()
+                        }
+                        TextField("program.args", text: $program.settings.arguments)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.body, design: .monospaced))
+                            .labelsHidden()
+                    }
                 }
-                Button("button.createShortcut") {
-                    let panel = NSSavePanel()
-                    let applicationDir = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask)[0]
-                    let name = program.name.replacingOccurrences(of: ".exe", with: "")
-                    panel.directoryURL = applicationDir
-                    panel.canCreateDirectories = true
-                    panel.allowedContentTypes = [UTType.applicationBundle]
-                    panel.allowsOtherFileTypes = false
-                    panel.isExtensionHidden = true
-                    panel.nameFieldStringValue = name + ".app"
-                    panel.begin { result in
-                        if result == .OK {
-                            if let url = panel.url {
-                                let name = url.deletingPathExtension().lastPathComponent
-                                Task(priority: .userInitiated) {
-                                    await ProgramShortcut.createShortcut(program, app: url, name: name)
+                EnvironmentArgView(program: program, isExpanded: $envArgsSectionExpanded)
+            }
+            .bottomBar {
+                HStack {
+                    Spacer()
+                    Button("button.showInFinder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([program.url])
+                    }
+                    Button("button.createShortcut") {
+                        let panel = NSSavePanel()
+                        let applicationDir = FileManager.default.urls(
+                            for: .applicationDirectory, in: .localDomainMask
+                        )[0]
+                        let name = program.name.replacingOccurrences(of: ".exe", with: "")
+                        panel.directoryURL = applicationDir
+                        panel.canCreateDirectories = true
+                        panel.allowedContentTypes = [UTType.applicationBundle]
+                        panel.allowsOtherFileTypes = false
+                        panel.isExtensionHidden = true
+                        panel.nameFieldStringValue = name + ".app"
+                        panel.begin { result in
+                            if result == .OK {
+                                if let url = panel.url {
+                                    let name = url.deletingPathExtension().lastPathComponent
+                                    Task(priority: .userInitiated) {
+                                        await ProgramShortcut.createShortcut(program, app: url, name: name)
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                Button("button.run") {
-                    programLoading = true
-                    program.run {
-                        Task { @MainActor in programLoading = false }
-                    } onFinished: {
-                        Task { @MainActor in programLoading = false }
+                    Button("button.run") {
+                        programLoading = true
+                        program.run {
+                            Task { @MainActor in programLoading = false }
+                        } onFinished: {
+                            Task { @MainActor in programLoading = false }
+                        }
+                    }
+                    .disabled(programLoading)
+                    if programLoading {
+                        Spacer()
+                            .frame(width: 10)
+                        ProgressView()
+                            .controlSize(.small)
                     }
                 }
-                .disabled(programLoading)
-                if programLoading {
-                    Spacer()
-                        .frame(width: 10)
-                    ProgressView()
-                        .controlSize(.small)
+                .padding()
+            }
+            .toolbar {
+                if let image = cachedIconImage {
+                    ToolbarItem(id: "ProgramViewIcon", placement: .navigation) {
+                        image
+                            .resizable()
+                            .frame(width: 25, height: 25)
+                            .padding(.trailing, 5)
+                    }
+                } else {
+                    ToolbarItem(id: "ProgramViewIcon", placement: .navigation) {
+                        Image(systemName: "app.dashed")
+                            .resizable()
+                            .frame(width: 25, height: 25)
+                            .padding(.trailing, 5)
+                    }
                 }
             }
-            .padding()
+            .navigationTitle(program.name)
+            .formStyle(.grouped)
         }
-        .toolbar {
-            if let image = cachedIconImage {
-                ToolbarItem(id: "ProgramViewIcon", placement: .navigation) {
-                    image
-                        .resizable()
-                        .frame(width: 25, height: 25)
-                        .padding(.trailing, 5)
-                }
-            } else {
-                ToolbarItem(id: "ProgramViewIcon", placement: .navigation) {
-                    Image(systemName: "app.dashed")
-                        .resizable()
-                        .frame(width: 25, height: 25)
-                        .padding(.trailing, 5)
-                }
-            }
-        }
-        .navigationTitle(program.name)
-        .formStyle(.grouped)
+        .animation(.whiskyDefault, value: programLoading)
         .animation(.whiskyDefault, value: configSectionExpanded)
         .animation(.whiskyDefault, value: envArgsSectionExpanded)
         .task {

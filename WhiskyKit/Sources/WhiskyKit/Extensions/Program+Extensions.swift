@@ -18,7 +18,6 @@
 
 import Foundation
 import AppKit
-import UserNotifications
 import os.log
 
 extension Program {
@@ -33,22 +32,14 @@ extension Program {
     func runInWine(onStarted: (@Sendable () -> Void)? = nil, onFinished: (@Sendable () -> Void)? = nil) {
         let arguments = settings.arguments.split { $0.isWhitespace }.map(String.init)
         let environment = generateEnvironment()
-        let programName = self.url.lastPathComponent
-        let notificationID = "launch-\(UUID().uuidString)"
-
-        Self.postLaunchNotification(programName: programName, identifier: notificationID)
 
         Task.detached(priority: .userInitiated) {
             do {
                 try await Wine.runProgram(
                     at: self.url, args: arguments, bottle: self.bottle, environment: environment,
-                    onStarted: {
-                        Self.removeLaunchNotification(identifier: notificationID)
-                        onStarted?()
-                    }
+                    onStarted: onStarted
                 )
             } catch {
-                Self.removeLaunchNotification(identifier: notificationID)
                 let errorMessage = error.localizedDescription
                 DispatchQueue.main.async {
                     self.showRunError(message: errorMessage)
@@ -56,19 +47,6 @@ extension Program {
             }
             onFinished?()
         }
-    }
-
-    private static func postLaunchNotification(programName: String, identifier: String) {
-        let content = UNMutableNotificationContent()
-        content.title = String(localized: "notification.launching.title")
-        content.body = String(localized: "notification.launching.body \(programName)")
-
-        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
-    }
-
-    private static func removeLaunchNotification(identifier: String) {
-        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [identifier])
     }
 
     public func generateTerminalCommand() -> String {
