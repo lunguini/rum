@@ -92,24 +92,15 @@ struct FileOpenView: View {
     func run() {
         if let bottle = bottles.first(where: { $0.url == selection }) {
             isLaunching = true
-            Task.detached(priority: .userInitiated) {
-                do {
-                    if fileURL.pathExtension == "bat" {
-                        try await Wine.runBatchFile(url: fileURL, bottle: bottle)
-                    } else {
-                        try await Wine.runProgram(at: fileURL, bottle: bottle,
-                                                  onStarted: {
-                            Task { @MainActor in dismiss() }
-                        })
-                    }
-                } catch {
-                    print(error)
-                }
+            let program = Program(url: fileURL, bottle: bottle)
+            program.run(onStarted: {
+                Task { @MainActor in dismiss() }
+            }, onFinished: {
                 Task { @MainActor in
                     isLaunching = false
                     dismiss()
                 }
-            }
+            })
         }
     }
 }

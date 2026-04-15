@@ -35,6 +35,12 @@ struct BottleView: View {
 
     private let gridLayout = [GridItem(.adaptive(minimum: 100, maximum: .infinity))]
 
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
+
     private var sortedHistory: [RunHistoryEntry] {
         bottle.settings.runHistory.sorted { $0.lastRun > $1.lastRun }
     }
@@ -69,7 +75,9 @@ struct BottleView: View {
                                             .foregroundStyle(.tertiary)
                                             .lineLimit(1)
                                             .truncationMode(.head)
-                                        Text(entry.lastRun, style: .relative)
+                                        let timeAgo = Self.relativeFormatter
+                                            .localizedString(for: entry.lastRun, relativeTo: Date())
+                                        Text(timeAgo)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }

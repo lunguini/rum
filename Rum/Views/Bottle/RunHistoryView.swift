@@ -22,6 +22,12 @@ import WhiskyKit
 struct RunHistoryView: View {
     @ObservedObject var bottle: Bottle
 
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
+
     private var sortedHistory: [RunHistoryEntry] {
         bottle.settings.runHistory.sorted { $0.lastRun > $1.lastRun }
     }
@@ -48,7 +54,7 @@ struct RunHistoryView: View {
                                     .foregroundStyle(.tertiary)
                                     .lineLimit(1)
                                     .truncationMode(.head)
-                                Text(entry.lastRun, style: .relative)
+                                Text(Self.relativeFormatter.localizedString(for: entry.lastRun, relativeTo: Date()))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
