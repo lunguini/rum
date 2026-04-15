@@ -40,40 +40,43 @@ struct RunHistoryView: View {
             } else {
                 Section {
                     ForEach(sortedHistory, id: \.self) { entry in
-                        HStack(spacing: 10) {
-                            if bottle.runningPrograms.contains(entry.url) {
-                                Circle()
-                                    .fill(.green)
-                                    .frame(width: 8, height: 8)
-                            }
-                            VStack(alignment: .leading, spacing: 2) {
+                        let isRunning = bottle.runningPrograms.contains(entry.url)
+                        let isPinned = bottle.settings.pins.contains { $0.url == entry.url }
+                        HStack(spacing: 0) {
+                            HStack(spacing: 8) {
+                                if isRunning {
+                                    Circle()
+                                        .fill(.green)
+                                        .frame(width: 8, height: 8)
+                                }
                                 Text(entry.name)
                                     .font(.body)
-                                Text(entry.url.path(percentEncoded: false))
+                                Text(entry.url.deletingLastPathComponent().path(percentEncoded: false))
                                     .font(.caption)
                                     .foregroundStyle(.tertiary)
                                     .lineLimit(1)
                                     .truncationMode(.head)
-                                Text(Self.relativeFormatter.localizedString(for: entry.lastRun, relativeTo: Date()))
+                                let timeAgo = Self.relativeFormatter
+                                    .localizedString(for: entry.lastRun, relativeTo: Date())
+                                Text(timeAgo)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Button {
-                                let program = Program(url: entry.url, bottle: bottle)
-                                program.pinned = true
-                            } label: {
-                                Image(systemName: "pin")
+                            ControlGroup {
+                                Button {
+                                    pinEntry(entry)
+                                } label: {
+                                    Image(systemName: isPinned ? "pin.slash" : "pin")
+                                }
+                                .disabled(isPinned)
+                                Button {
+                                    let program = Program(url: entry.url, bottle: bottle)
+                                    program.run()
+                                } label: {
+                                    Image(systemName: "play.fill")
+                                }
                             }
-                            .buttonStyle(.borderless)
-                            .help("button.pin")
-                            Button {
-                                let program = Program(url: entry.url, bottle: bottle)
-                                program.run()
-                            } label: {
-                                Image(systemName: "play.fill")
-                            }
-                            .buttonStyle(.borderedProminent)
                             .controlSize(.small)
                         }
                         .contextMenu {
@@ -87,5 +90,13 @@ struct RunHistoryView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("tab.history")
+    }
+
+    private func pinEntry(_ entry: RunHistoryEntry) {
+        let program = Program(url: entry.url, bottle: bottle)
+        if !bottle.programs.contains(where: { $0.url == entry.url }) {
+            bottle.programs.append(program)
+        }
+        program.pinned = true
     }
 }
