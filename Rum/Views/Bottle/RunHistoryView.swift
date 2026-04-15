@@ -34,7 +34,7 @@ struct RunHistoryView: View {
             } else {
                 Section {
                     ForEach(sortedHistory, id: \.self) { entry in
-                        HStack {
+                        HStack(spacing: 10) {
                             if bottle.runningPrograms.contains(entry.url) {
                                 Circle()
                                     .fill(.green)
@@ -43,6 +43,11 @@ struct RunHistoryView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(entry.name)
                                     .font(.body)
+                                Text(entry.url.path(percentEncoded: false))
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
                                 Text(entry.lastRun, style: .relative)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -50,12 +55,20 @@ struct RunHistoryView: View {
                             Spacer()
                             Button {
                                 let program = Program(url: entry.url, bottle: bottle)
+                                program.pinned = true
+                            } label: {
+                                Image(systemName: "pin")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("button.pin")
+                            Button {
+                                let program = Program(url: entry.url, bottle: bottle)
                                 program.run()
                             } label: {
                                 Image(systemName: "play.fill")
                             }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
                         }
                         .contextMenu {
                             Button("history.remove", role: .destructive) {
