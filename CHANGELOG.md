@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.0
+
+### New Features
+
+- Per-bottle run history — tracks every executable run with timestamp, shows running indicators, and allows re-launching from the history list
+- Pin/unpin programs directly from run history to the pinned programs grid
+- Launch feedback — "Launching..." banner with spinner shown in both ProgramView and Open With flows
+
+### Improvements
+
+- Replaced Sparkle with a GitHub release update checker (Sparkle's appcast was never configured)
+- Reworked bottle view — pinned programs and run history visible at a glance, Programs and Configuration moved to bottom bar
+- History rows show filename, directory path, relative time, and pin/play button group
+- Added folder usage descriptions (Downloads, Desktop, Documents) to fix repeated macOS permission prompts
+
 ## 1.0.3
 
 ### Fixes
