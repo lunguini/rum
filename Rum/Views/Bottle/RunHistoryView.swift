@@ -65,11 +65,14 @@ struct RunHistoryView: View {
                             Spacer()
                             ControlGroup {
                                 Button {
-                                    pinEntry(entry)
+                                    if isPinned {
+                                        unpinEntry(entry)
+                                    } else {
+                                        pinEntry(entry)
+                                    }
                                 } label: {
                                     Image(systemName: isPinned ? "pin.slash" : "pin")
                                 }
-                                .disabled(isPinned)
                                 Button {
                                     let program = Program(url: entry.url, bottle: bottle)
                                     program.run()
@@ -98,5 +101,9 @@ struct RunHistoryView: View {
             bottle.programs.append(program)
         }
         program.pinned = true
+    }
+
+    private func unpinEntry(_ entry: RunHistoryEntry) {
+        bottle.settings.pins.removeAll { $0.url == entry.url }
     }
 }
