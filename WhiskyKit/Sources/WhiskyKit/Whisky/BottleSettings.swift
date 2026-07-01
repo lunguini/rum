@@ -146,6 +146,8 @@ public struct BottleDXVKConfig: Codable, Equatable {
     var dxvk: Bool = true
     var dxvkAsync: Bool = true
     var dxvkHud: DXVKHUD = .off
+    /// Frame rate cap applied via `DXVK_FRAME_RATE`. `0` means unlimited.
+    var dxvkFrameRate: Int = 0
 
     public init() {}
 
@@ -154,6 +156,7 @@ public struct BottleDXVKConfig: Codable, Equatable {
         self.dxvk = try container.decodeIfPresent(Bool.self, forKey: .dxvk) ?? true
         self.dxvkAsync = try container.decodeIfPresent(Bool.self, forKey: .dxvkAsync) ?? true
         self.dxvkHud = try container.decodeIfPresent(DXVKHUD.self, forKey: .dxvkHud) ?? .off
+        self.dxvkFrameRate = try container.decodeIfPresent(Int.self, forKey: .dxvkFrameRate) ?? 0
     }
 }
 
@@ -260,6 +263,12 @@ public struct BottleSettings: Codable, Equatable {
         set { dxvkConfig.dxvkHud = newValue }
     }
 
+    /// Frame rate cap applied via `DXVK_FRAME_RATE`. `0` means unlimited.
+    public var dxvkFrameRate: Int {
+        get { return dxvkConfig.dxvkFrameRate }
+        set { dxvkConfig.dxvkFrameRate = newValue }
+    }
+
     @discardableResult
     public static func decode(from metadataURL: URL) throws -> BottleSettings {
         guard FileManager.default.fileExists(atPath: metadataURL.path(percentEncoded: false)) else {
@@ -310,6 +319,10 @@ public struct BottleSettings: Codable, Equatable {
                 wineEnv.updateValue("fps", forKey: "DXVK_HUD")
             case .off:
                 break
+            }
+
+            if dxvkFrameRate > 0 {
+                wineEnv.updateValue(String(dxvkFrameRate), forKey: "DXVK_FRAME_RATE")
             }
         }
 

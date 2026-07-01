@@ -85,7 +85,9 @@ extension FileHandle {
         if bottle.settings.dxvk {
             header += "DXVK: \(bottle.settings.dxvk)\n"
             header += "DXVK Async: \(bottle.settings.dxvkAsync)\n"
-            header += "DXVK HUD: \(bottle.settings.dxvkHud)\n\n"
+            header += "DXVK HUD: \(bottle.settings.dxvkHud)\n"
+            let frameRate = bottle.settings.dxvkFrameRate
+            header += "DXVK Frame Rate: \(frameRate > 0 ? String(frameRate) : "unlimited")\n\n"
         }
 
         write(line: header)

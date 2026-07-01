@@ -44,6 +44,77 @@ struct WinetricksCategory {
 class Winetricks {
     static let winetricksURL: URL = WhiskyWineInstaller.libraryFolder
         .appending(path: "winetricks")
+    static let verbsURL: URL = WhiskyWineInstaller.libraryFolder
+        .appending(path: "verbs.txt")
+
+    /// Official self-contained winetricks script.
+    private static let winetricksDownloadURL = URL(
+        string: "https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks"
+    )
+
+    /// Ensures the `winetricks` script and its `verbs.txt` verb list exist in the library folder,
+    /// downloading/generating them on first use. Rum's installer does not bundle these, so the
+    /// Winetricks UI would otherwise open with an empty list. Returns `true` when the verb list
+    /// is available to parse.
+    @discardableResult
+    static func ensureInstalled() async -> Bool {
+        let fileManager = FileManager.default
+        let libraryFolder = WhiskyWineInstaller.libraryFolder
+
+        if !fileManager.fileExists(atPath: winetricksURL.path(percentEncoded: false)) {
+            guard let winetricksDownloadURL else { return false }
+            do {
+                if !fileManager.fileExists(atPath: libraryFolder.path(percentEncoded: false)) {
+                    try fileManager.createDirectory(at: libraryFolder, withIntermediateDirectories: true)
+                }
+                let (data, _) = try await URLSession.shared.data(from: winetricksDownloadURL)
+                try data.write(to: winetricksURL)
+                try fileManager.setAttributes(
+                    [.posixPermissions: 0o755],
+                    ofItemAtPath: winetricksURL.path(percentEncoded: false)
+                )
+            } catch {
+                print("Failed to download winetricks: \(error)")
+                return false
+            }
+        }
+
+        if !fileManager.fileExists(atPath: verbsURL.path(percentEncoded: false)) {
+            await generateVerbs()
+        }
+
+        return fileManager.fileExists(atPath: verbsURL.path(percentEncoded: false))
+    }
+
+    /// Runs `winetricks list-all` headlessly and captures its output into `verbs.txt`. The
+    /// output is already grouped as `===== category =====` blocks, which `parseVerbs` expects.
+    private static func generateVerbs() async {
+        guard let resourcesURL = Bundle.main.url(forResource: "cabextract", withExtension: nil)?
+            .deletingLastPathComponent() else { return }
+        let binPath = WhiskyWineInstaller.binFolder.path
+        let resPath = resourcesURL.path(percentEncoded: false)
+        let wineName = Wine.wineBinary.lastPathComponent
+        let tricks = winetricksURL.path(percentEncoded: false)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = [
+            "-c",
+            #"PATH="\#(binPath):\#(resPath):$PATH" WINE=\#(wineName) "\#(tricks)" list-all"#
+        ]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            try data.write(to: verbsURL)
+        } catch {
+            print("Failed to generate winetricks verbs: \(error)")
+        }
+    }
 
     static func runCommand(command: String, bottle: Bottle) async {
         guard let resourcesURL = Bundle.main.url(forResource: "cabextract", withExtension: nil)?
@@ -87,16 +158,11 @@ class Winetricks {
     }
 
     static func parseVerbs() async -> [WinetricksCategory] {
+        // Make sure the winetricks script and verb list are present before reading them.
+        guard await ensureInstalled() else { return [] }
+
         // Grab the verbs file
-        let verbsURL = WhiskyWineInstaller.libraryFolder.appending(path: "verbs.txt")
-        let verbs: String = await { () async -> String in
-            do {
-                let (data, _) = try await URLSession.shared.data(from: verbsURL)
-                return String(data: data, encoding: .utf8) ?? String()
-            } catch {
-                return String()
-            }
-        }()
+        let verbs: String = (try? String(contentsOf: verbsURL, encoding: .utf8)) ?? String()
 
         // Read the file line by line
         let lines = verbs.components(separatedBy: "\n")

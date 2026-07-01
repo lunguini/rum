@@ -34,7 +34,7 @@ struct WinetricksView: View {
             .padding(.bottom)
 
             // Tabbed view
-            if let winetricks = winetricks {
+            if let winetricks = winetricks, !winetricks.isEmpty {
                 TabView {
                     ForEach(winetricks, id: \.category) { category in
                         Table(category.verbs, selection: $selectedTrick) {
@@ -70,6 +70,19 @@ struct WinetricksView: View {
                         .buttonStyle(.borderedProminent)
                     }
                 }
+            } else if winetricks != nil {
+                Spacer()
+                ContentUnavailableView {
+                    Label("winetricks.unavailable.title", systemImage: "wifi.exclamationmark")
+                } description: {
+                    Text("winetricks.unavailable.info")
+                } actions: {
+                    Button("winetricks.unavailable.retry") {
+                        winetricks = nil
+                        loadVerbs()
+                    }
+                }
+                Spacer()
             } else {
                 Spacer()
                 ProgressView()
@@ -80,14 +93,18 @@ struct WinetricksView: View {
         }
         .padding()
         .onAppear {
-            Task.detached {
-                let tricks = await Winetricks.parseVerbs()
-
-                await MainActor.run {
-                    winetricks = tricks
-                }
-            }
+            loadVerbs()
         }
         .frame(minWidth: ViewWidth.large, minHeight: 400)
+    }
+
+    private func loadVerbs() {
+        Task.detached {
+            let tricks = await Winetricks.parseVerbs()
+
+            await MainActor.run {
+                winetricks = tricks
+            }
+        }
     }
 }

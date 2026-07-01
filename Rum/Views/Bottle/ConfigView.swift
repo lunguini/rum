@@ -132,6 +132,16 @@ struct ConfigView: View {
                     Text("config.dxvkHud.off").tag(DXVKHUD.off)
                 }
                 .disabled(!bottle.settings.dxvk)
+                Picker(selection: $bottle.settings.dxvkFrameRate) {
+                    Text("config.dxvkFrameRate.unlimited").tag(0)
+                    ForEach([30, 60, 90, 120, 144, 240], id: \.self) { fps in
+                        Text("\(fps) FPS").tag(fps)
+                    }
+                } label: {
+                    Text("config.dxvkFrameRate")
+                    Text("config.dxvkFrameRate.info")
+                }
+                .disabled(!bottle.settings.dxvk)
             }
             Section("config.title.metal", isExpanded: $metalSectionExpanded) {
                 Toggle(isOn: $bottle.settings.metalHud) {
