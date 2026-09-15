@@ -20,7 +20,12 @@ import Foundation
 
 extension Wine {
     public static func enableDXVK(bottle: Bottle) throws {
-        try RendererStateStore.applyDXVK(bottle: bottle, sourceRoot: Wine.dxvkFolder)
+        let engine = try WhiskyWineInstaller.wineEngine(for: bottle.settings.wineEngineID)
+        try RendererStateStore.applyDXVK(
+            bottle: bottle,
+            sourceRoot: Wine.dxvkFolder,
+            engine: engine
+        )
     }
 
     static func prepareGraphicsBackend(_ backend: GraphicsBackend, for bottle: Bottle) throws {
@@ -35,9 +40,17 @@ extension Wine {
     ) throws {
         switch backend {
         case .wineD3D:
-            try RendererStateStore.restoreRenderer(bottle: bottle, sourceRoot: Wine.dxvkFolder)
+            try RendererStateStore.restoreRenderer(
+                bottle: bottle,
+                sourceRoot: Wine.dxvkFolder,
+                engine: engine
+            )
         case .dxvk:
-            try enableDXVK(bottle: bottle)
+            try RendererStateStore.applyDXVK(
+                bottle: bottle,
+                sourceRoot: Wine.dxvkFolder,
+                engine: engine
+            )
         case .dxmt:
             let capabilities = WhiskyWineInstaller.graphicsCapabilities(for: engine)
             guard let root = capabilities.dxmtRootURL else {
@@ -46,7 +59,11 @@ extension Wine {
                     "Wine engine \(engine.displayName) has no compatible DXMT payload."
                 )
             }
-            try RendererStateStore.applyDXMT(bottle: bottle, sourceRoot: root)
+            try RendererStateStore.applyDXMT(
+                bottle: bottle,
+                sourceRoot: root,
+                engine: engine
+            )
         case .d3dmetal:
             let capabilities = WhiskyWineInstaller.graphicsCapabilities(for: engine)
             guard let root = capabilities.d3dmetalRootURL else {
@@ -55,7 +72,11 @@ extension Wine {
                     "Wine engine \(engine.displayName) has no compatible D3DMetal payload."
                 )
             }
-            try RendererStateStore.applyD3DMetal(bottle: bottle, sourceRoot: root)
+            try RendererStateStore.applyD3DMetal(
+                bottle: bottle,
+                sourceRoot: root,
+                engine: engine
+            )
         }
     }
 
@@ -63,7 +84,11 @@ extension Wine {
     /// longer matches the installed artifact, which protects a user replacement from being
     /// silently discarded.
     public static func disableDXVK(bottle: Bottle) throws {
-        try RendererStateStore.restoreRenderer(bottle: bottle, sourceRoot: Wine.dxvkFolder)
+        try RendererStateStore.restoreRenderer(
+            bottle: bottle,
+            sourceRoot: Wine.dxvkFolder,
+            engine: try? WhiskyWineInstaller.wineEngine(for: bottle.settings.wineEngineID)
+        )
     }
 
     static func validateGraphicsBackend(_ backend: GraphicsBackend, for bottle: Bottle) throws {

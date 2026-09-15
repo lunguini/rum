@@ -34,37 +34,45 @@ struct BottleRendererState: Codable, Equatable, Sendable {
 enum RendererStateStore {
     private static let stateFileName = ".rum-renderer-state.plist"
 
-    private struct RestoreBackup {
-        let destination: URL
-        let destinationBackup: URL
-        let original: URL
-        let originalBackup: URL?
-    }
-
-    static func applyDXVK(bottle: Bottle, sourceRoot: URL) throws {
+    static func applyDXVK(
+        bottle: Bottle,
+        sourceRoot: URL,
+        engine: WineEngine? = nil
+    ) throws {
         try apply(
             bottle: bottle,
             backend: .dxvk,
             mappings: sourceMappings(for: bottle, backend: .dxvk, sourceRoot: sourceRoot),
-            restoreLegacyDXVKFiles: false
+            restoreLegacyDXVKFiles: false,
+            engine: engine
         )
     }
 
-    static func applyDXMT(bottle: Bottle, sourceRoot: URL) throws {
+    static func applyDXMT(
+        bottle: Bottle,
+        sourceRoot: URL,
+        engine: WineEngine? = nil
+    ) throws {
         try apply(
             bottle: bottle,
             backend: .dxmt,
             mappings: sourceMappings(for: bottle, backend: .dxmt, sourceRoot: sourceRoot),
-            restoreLegacyDXVKFiles: true
+            restoreLegacyDXVKFiles: true,
+            engine: engine
         )
     }
 
-    static func applyD3DMetal(bottle: Bottle, sourceRoot: URL) throws {
+    static func applyD3DMetal(
+        bottle: Bottle,
+        sourceRoot: URL,
+        engine: WineEngine? = nil
+    ) throws {
         try apply(
             bottle: bottle,
             backend: .d3dmetal,
             mappings: sourceMappings(for: bottle, backend: .d3dmetal, sourceRoot: sourceRoot),
-            restoreLegacyDXVKFiles: true
+            restoreLegacyDXVKFiles: true,
+            engine: engine
         )
     }
 
@@ -72,14 +80,15 @@ enum RendererStateStore {
         bottle: Bottle,
         backend: GraphicsBackend,
         mappings: [(destination: URL, source: URL)],
-        restoreLegacyDXVKFiles: Bool
+        restoreLegacyDXVKFiles: Bool,
+        engine: WineEngine?
     ) throws {
         if let state = try load(for: bottle) {
             if state.backend == backend,
                stateMatchesInstalledFiles(state, bottle: bottle, mappings: mappings) {
                 return
             }
-            try restore(state, for: bottle)
+            try restore(state, for: bottle, engine: engine)
         } else if restoreLegacyDXVKFiles {
             try restoreLegacyDXVK(bottle: bottle, sourceRoot: Wine.dxvkFolder)
         }
@@ -109,9 +118,13 @@ enum RendererStateStore {
         }
     }
 
-    static func restoreRenderer(bottle: Bottle, sourceRoot: URL) throws {
+    static func restoreRenderer(
+        bottle: Bottle,
+        sourceRoot: URL,
+        engine: WineEngine? = nil
+    ) throws {
         if let state = try load(for: bottle) {
-            try restore(state, for: bottle)
+            try restore(state, for: bottle, engine: engine)
             return
         }
 
@@ -241,104 +254,6 @@ extension RendererStateStore {
         return current == installed
     }
 
-    private static func restore(_ state: BottleRendererState, for bottle: Bottle) throws {
-        try validateRestoreState(state, for: bottle)
-
-        let backupDirectory = bottle.url.appending(path: ".rum-renderer-restore-\(UUID().uuidString)")
-        do {
-            try FileManager.default.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
-            let backups = try makeRestoreBackups(state, for: bottle, in: backupDirectory)
-            do {
-                try applyRestore(state, backups: backups)
-                try FileManager.default.removeItem(at: stateURL(for: bottle))
-            } catch {
-                rollbackRestore(backups)
-                throw error
-            }
-            try? FileManager.default.removeItem(at: backupDirectory)
-        } catch {
-            try? FileManager.default.removeItem(at: backupDirectory)
-            throw error
-        }
-    }
-
-    private static func validateRestoreState(
-        _ state: BottleRendererState,
-        for bottle: Bottle
-    ) throws {
-        for file in state.files {
-            let destinationURL = try destinationURL(for: file.relativePath, in: bottle)
-            guard sha256(of: destinationURL) == file.installedSHA256 else {
-                throw RendererStateError.userModifiedFile(destinationURL.path)
-            }
-
-            let originalURL = destinationURL.appendingPathExtension("orig")
-            if file.originalExisted {
-                guard let originalSHA256 = file.originalSHA256,
-                      sha256(of: originalURL) == originalSHA256 else {
-                    throw RendererStateError.userModifiedFile(originalURL.path)
-                }
-            } else if FileManager.default.fileExists(atPath: originalURL.path) {
-                throw RendererStateError.userModifiedFile(originalURL.path)
-            }
-        }
-    }
-
-    private static func makeRestoreBackups(
-        _ state: BottleRendererState,
-        for bottle: Bottle,
-        in backupDirectory: URL
-    ) throws -> [RestoreBackup] {
-        var backups: [RestoreBackup] = []
-        for (index, file) in state.files.enumerated() {
-            let destinationURL = try destinationURL(for: file.relativePath, in: bottle)
-            let originalURL = destinationURL.appendingPathExtension("orig")
-            let directory = backupDirectory.appending(path: String(index))
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let destinationBackup = directory.appending(path: "destination")
-            try FileManager.default.copyItem(at: destinationURL, to: destinationBackup)
-            var originalBackup: URL?
-            if file.originalExisted {
-                let backup = directory.appending(path: "original")
-                try FileManager.default.copyItem(at: originalURL, to: backup)
-                originalBackup = backup
-            }
-            backups.append(
-                RestoreBackup(
-                    destination: destinationURL,
-                    destinationBackup: destinationBackup,
-                    original: originalURL,
-                    originalBackup: originalBackup
-                )
-            )
-        }
-        return backups
-    }
-
-    private static func applyRestore(
-        _ state: BottleRendererState,
-        backups: [RestoreBackup]
-    ) throws {
-        for (file, backup) in zip(state.files, backups) {
-            if file.originalExisted {
-                try FileManager.default.removeItem(at: backup.destination)
-                try FileManager.default.moveItem(at: backup.original, to: backup.destination)
-            } else {
-                try FileManager.default.removeItem(at: backup.destination)
-            }
-        }
-    }
-
-    private static func rollbackRestore(_ backups: [RestoreBackup]) {
-        for backup in backups.reversed() {
-            try? FileManager.default.removeItem(at: backup.destination)
-            try? FileManager.default.moveItem(at: backup.destinationBackup, to: backup.destination)
-            if let originalBackup = backup.originalBackup {
-                try? FileManager.default.removeItem(at: backup.original)
-                try? FileManager.default.moveItem(at: originalBackup, to: backup.original)
-            }
-        }
-    }
 }
 
 extension RendererStateStore {
@@ -360,11 +275,11 @@ extension RendererStateStore {
         try data.write(to: stateURL(for: bottle), options: .atomic)
     }
 
-    private static func stateURL(for bottle: Bottle) -> URL {
+    static func stateURL(for bottle: Bottle) -> URL {
         bottle.url.appending(path: stateFileName)
     }
 
-    private static func destinationURL(
+    static func destinationURL(
         for relativePath: String,
         in bottle: Bottle
     ) throws -> URL {
@@ -392,7 +307,7 @@ extension RendererStateStore {
         return urlPath.hasPrefix(prefix) ? String(urlPath.dropFirst(prefix.count)) : urlPath
     }
 
-    private static func sha256(of url: URL) -> String? {
+    static func sha256(of url: URL) -> String? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }

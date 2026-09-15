@@ -89,98 +89,78 @@ final class RendererStateTests: XCTestCase {
         )
     }
 
-    private struct Fixture {
-        let root: URL
-        let dxmtRoot: URL
-        let d3dmetalRoot: URL
-        let bottleURL: URL
-        let system32: URL
-        let syswow64: URL
-        let bottle: Bottle
-    }
+    func testManagedEngineRefreshDoesNotBlockRendererSwitch() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let engineRoot = fixture.root.appending(path: "engine")
+        let engine = try makeManagedEngine(at: engineRoot)
 
-    private func makeFixture() throws -> Fixture {
-        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        let dxmtRoot = root.appending(path: "dxmt")
-        try makeFileWithData(dxmtRoot.appending(path: "x86_64-windows/d3d11.dll"), data: "dxmt-d3d11")
-        try makeFileWithData(dxmtRoot.appending(path: "x86_64-windows/dxgi.dll"), data: "dxmt-dxgi")
-        try makeFileWithData(
-            dxmtRoot.appending(path: "x86_64-windows/winemetal.dll"),
-            data: "dxmt-winemetal"
-        )
-        try makeFileWithData(
-            dxmtRoot.appending(path: "i386-windows/d3d11.dll"),
-            data: "dxmt-x86-d3d11"
+        try RendererStateStore.applyDXMT(
+            bottle: fixture.bottle,
+            sourceRoot: fixture.dxmtRoot,
+            engine: engine
         )
 
-        let d3dmetalRoot = root.appending(path: "d3dmetal")
-        try makeFileWithData(
-            d3dmetalRoot.appending(path: "wine/x86_64-windows/d3d11.dll"),
-            data: "d3dmetal-d3d11"
-        )
-        try makeFileWithData(
-            d3dmetalRoot.appending(path: "wine/x86_64-windows/d3d12.dll"),
-            data: "d3dmetal-d3d12"
-        )
-        try makeFileWithData(
-            d3dmetalRoot.appending(path: "wine/x86_64-windows/dxgi.dll"),
-            data: "d3dmetal-dxgi"
+        try simulateManagedEngineRefresh(in: fixture, engineRoot: engineRoot)
+
+        try RendererStateStore.applyD3DMetal(
+            bottle: fixture.bottle,
+            sourceRoot: fixture.d3dmetalRoot,
+            engine: engine
         )
 
-        let bottleURL = root.appending(path: "bottle")
-        let system32 = bottleURL.appending(path: "drive_c/windows/system32")
-        let syswow64 = bottleURL.appending(path: "drive_c/windows/syswow64")
-        try makeFileWithData(system32.appending(path: "d3d11.dll"), data: "original-d3d11")
-        try makeFileWithData(system32.appending(path: "dxgi.dll"), data: "original-dxgi")
-        try makeFileWithData(
-            system32.appending(path: "winemetal.dll"),
-            data: "original-winemetal"
-        )
-        try makeFileWithData(
-            syswow64.appending(path: "d3d11.dll"),
-            data: "original-x86-d3d11"
-        )
-
-        return Fixture(
-            root: root,
-            dxmtRoot: dxmtRoot,
-            d3dmetalRoot: d3dmetalRoot,
-            bottleURL: bottleURL,
-            system32: system32,
-            syswow64: syswow64,
-            bottle: Bottle(bottleUrl: bottleURL)
-        )
-    }
-
-    private func assertOriginalFiles(in fixture: Fixture) throws {
-        try assertFile(fixture.system32.appending(path: "d3d11.dll"), equals: "original-d3d11")
-        try assertFile(fixture.system32.appending(path: "dxgi.dll"), equals: "original-dxgi")
+        try assertFile(fixture.system32.appending(path: "d3d11.dll"), equals: "d3dmetal-d3d11")
+        try assertFile(fixture.system32.appending(path: "dxgi.dll"), equals: "d3dmetal-dxgi")
+        try assertFile(fixture.system32.appending(path: "d3d12.dll"), equals: "d3dmetal-d3d12")
         try assertFile(
             fixture.system32.appending(path: "winemetal.dll"),
             equals: "original-winemetal"
         )
         XCTAssertFalse(
             FileManager.default.fileExists(
-                atPath: fixture.bottleURL.appending(path: ".rum-renderer-state.plist").path
+                atPath: fixture.system32.appending(path: "d3d10core.dll").path
+            )
+        )
+        try assertFile(
+            fixture.system32.appending(path: "nvapi64.dll"),
+            equals: "original-nvapi64"
+        )
+        try assertFile(fixture.system32.appending(path: "nvngx.dll"), equals: "original-nvngx")
+        try assertFile(fixture.syswow64.appending(path: "d3d11.dll"), equals: "original-x86-d3d11")
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: fixture.syswow64.appending(path: "d3d10core.dll").path
             )
         )
     }
 
-    private func makeFileWithData(_ url: URL, data: String) throws {
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
+    func testManagedEngineRecoveryStillRejectsUnknownReplacement() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let engineRoot = fixture.root.appending(path: "engine")
+        let engine = try makeManagedEngine(at: engineRoot)
+
+        try RendererStateStore.applyDXMT(
+            bottle: fixture.bottle,
+            sourceRoot: fixture.dxmtRoot,
+            engine: engine
         )
-        try Data(data.utf8).write(to: url)
+        try Data("user-change".utf8).write(
+            to: fixture.system32.appending(path: "d3d10core.dll")
+        )
+
+        XCTAssertThrowsError(
+            try RendererStateStore.applyD3DMetal(
+                bottle: fixture.bottle,
+                sourceRoot: fixture.d3dmetalRoot,
+                engine: engine
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? RendererStateError,
+                .userModifiedFile(fixture.system32.appending(path: "d3d10core.dll").path)
+            )
+        }
     }
 
-    private func makeTemporaryDirectory() throws -> URL {
-        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory
-    }
-
-    private func assertFile(_ url: URL, equals data: String) throws {
-        XCTAssertEqual(try Data(contentsOf: url), Data(data.utf8))
-    }
 }
