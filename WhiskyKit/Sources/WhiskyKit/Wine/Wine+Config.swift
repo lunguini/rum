@@ -18,6 +18,17 @@
 
 import Foundation
 
+enum WineInterfaceError: Error {
+    case invalidResponce
+}
+
+enum RegistryType: String {
+    case binary = "REG_BINARY"
+    case dword = "REG_DWORD"
+    case qword = "REG_QWORD"
+    case string = "REG_SZ"
+}
+
 extension Wine {
     private enum RegistryKey: String {
         case currentVersion = #"HKLM\Software\Microsoft\Windows NT\CurrentVersion"#

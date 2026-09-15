@@ -31,9 +31,15 @@ struct BottleView: View {
     @ObservedObject var bottle: Bottle
     @State private var path = NavigationPath()
     @State private var launchingCount: Int = 0
+    @State private var launchError: LaunchError?
     @State private var showWinetricksSheet: Bool = false
 
     private let gridLayout = [GridItem(.adaptive(minimum: 100, maximum: .infinity))]
+
+    private struct LaunchError: Identifiable {
+        let id = UUID()
+        let message: String
+    }
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
@@ -161,7 +167,12 @@ struct BottleView: View {
                                     }
                                 } catch {
                                     print("Failed to run program: \(error)")
-                                    await MainActor.run { launchingCount -= 1 }
+                                    await MainActor.run {
+                                        launchingCount = max(launchingCount - 1, 0)
+                                        launchError = LaunchError(
+                                            message: "\(url.lastPathComponent): \(error.localizedDescription)"
+                                        )
+                                    }
                                 }
                                 await MainActor.run { bottle.runningPrograms.remove(url) }
                                 updateStartMenu()
@@ -185,6 +196,14 @@ struct BottleView: View {
             .navigationTitle(bottle.settings.name)
             .sheet(isPresented: $showWinetricksSheet) {
                 WinetricksView(bottle: bottle)
+            }
+            .alert("alert.message", isPresented: Binding(
+                get: { launchError != nil },
+                set: { if !$0 { launchError = nil } }
+            )) {
+                Button("button.ok", role: .cancel) {}
+            } message: {
+                Text(launchError?.message ?? "")
             }
             .onChange(of: bottle.settings) { oldValue, newValue in
                 guard oldValue != newValue else { return }

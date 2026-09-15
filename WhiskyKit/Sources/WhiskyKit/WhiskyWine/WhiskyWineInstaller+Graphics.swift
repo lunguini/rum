@@ -39,7 +39,7 @@ extension WhiskyWineInstaller {
         guard let engine = activeWineEngine(in: libraryFolder) else {
             return unavailableCapabilities(in: libraryFolder)
         }
-        return graphicsCapabilities(for: engine)
+        return graphicsCapabilities(for: engine, in: libraryFolder)
     }
 
     /// Scan a particular bottle-selected engine. `nil` follows the global default; a missing
@@ -49,21 +49,36 @@ extension WhiskyWineInstaller {
         in libraryFolder: URL = libraryFolder
     ) -> WineGraphicsCapabilities? {
         guard let engine = try? wineEngine(for: engineID, in: libraryFolder) else { return nil }
-        return graphicsCapabilities(for: engine)
+        return graphicsCapabilities(for: engine, in: libraryFolder)
     }
 
-    static func graphicsCapabilities(for engine: WineEngine) -> WineGraphicsCapabilities {
+    static func graphicsCapabilities(
+        for engine: WineEngine,
+        in libraryFolder: URL = WhiskyWineInstaller.libraryFolder
+    ) -> WineGraphicsCapabilities {
         let root = engine.wineURL
         let macDriver = root.appending(path: "lib/wine/x86_64-unix/winemac.so")
         let exportsRequiredAPI = hasExportedSymbol("macdrv_functions", in: macDriver)
+
+        let templateDXMTRoot = engine.kind == .sikarugir
+            ? sikarugirTemplateRendererRoot(for: .dxmt, libraryFolder: libraryFolder)
+                .flatMap(findDXMTRoot(in:))
+            : nil
+        let templateD3DMetalRoot = engine.kind == .sikarugir
+            ? sikarugirTemplateRendererRoot(for: .d3dmetal, libraryFolder: libraryFolder)
+                .flatMap(findD3DMetalRoot(in:))
+            : nil
 
         return WineGraphicsCapabilities(
             engineID: engine.id,
             engineName: engine.displayName,
             wineRootURL: root,
             macDriverExportsRequiredAPI: exportsRequiredAPI,
-            dxmtRootURL: findDXMTRoot(in: root),
+            dxmtRootURL: findDXMTRoot(in: root)
+                ?? installedDXMTRoot(in: libraryFolder)
+                ?? templateDXMTRoot,
             d3dmetalRootURL: findD3DMetalRoot(in: root)
+                ?? templateD3DMetalRoot
         )
     }
 
@@ -99,7 +114,7 @@ extension WhiskyWineInstaller {
         let capabilities: WineGraphicsCapabilities? = {
             switch backend {
             case .dxmt, .d3dmetal:
-                return engine.map(graphicsCapabilities(for:))
+                return engine.map { graphicsCapabilities(for: $0, in: libraryFolder) }
             case .wineD3D, .dxvk:
                 return nil
             }
@@ -111,6 +126,14 @@ extension WhiskyWineInstaller {
             wineserver: wineserver,
             rendererPaths: rendererDLLPaths(for: backend, capabilities: capabilities)
         )
+
+        if engine?.kind == .sikarugir,
+           let frameworks = sikarugirTemplateFrameworksURL(for: libraryFolder) {
+            result["DYLD_FALLBACK_LIBRARY_PATH"] = prepend(
+                [frameworks.path],
+                to: result["DYLD_FALLBACK_LIBRARY_PATH"]
+            )
+        }
 
         if engine?.kind == .crossOver {
             if let engine {
@@ -216,6 +239,8 @@ extension WhiskyWineInstaller {
     /// layout can be unit-tested without requiring an installed renderer.
     static func findDXMTRoot(in wineRoot: URL) -> URL? {
         let candidates = [
+            wineRoot,
+            wineRoot.appending(path: "wine"),
             wineRoot.appending(path: "lib/dxmt"),
             wineRoot.appending(path: "lib/wine")
         ]

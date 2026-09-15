@@ -19,10 +19,6 @@
 import SwiftUI
 import WhiskyKit
 
-private let externalEngineLicenseNote = "External engines are used from software you installed. "
-    + "Rum stores a path reference and does not copy, download, or redistribute their runtime files. "
-    + "Apple's GPTK license still applies to D3DMetal."
-
 // The manager keeps discovery, activation, and download rows together so their operation-state
 // handling stays consistent.
 // swiftlint:disable:next type_body_length
@@ -86,6 +82,7 @@ struct WineManagerView: View {
                     } footer: {
                         Text(externalEngineLicenseNote)
                     }
+                    DXMTRuntimeSection()
                     if !externalEngines.isEmpty {
                         Section("External") {
                             ForEach(externalEngines) { engine in
@@ -119,7 +116,8 @@ struct WineManagerView: View {
                     } footer: {
                         Text(
                             "Sikarugir engines are third-party Wine builds. "
-                                + "Review their licenses and compatibility before use."
+                                + "Review their licenses and compatibility before use. "
+                                + "The first install also fetches the official template support files."
                         )
                     }
                 }
@@ -171,8 +169,14 @@ struct WineManagerView: View {
         let isActive = activeExternalEngineID == engine.id
         return HStack {
             VStack(alignment: .leading) {
-                Text(engine.displayName)
-                    .fontWeight(isActive ? .semibold : .regular)
+                HStack(spacing: 6) {
+                    if isActive {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.tint)
+                    }
+                    Text(engine.displayName)
+                        .fontWeight(isActive ? .semibold : .regular)
+                }
                 Text(engine.appURL.path(percentEncoded: false))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -202,8 +206,14 @@ struct WineManagerView: View {
     private func installedRow(_ build: InstalledWineBuild) -> some View {
         HStack {
             VStack(alignment: .leading) {
-                Text(build.displayName)
-                    .fontWeight(build.isActive ? .semibold : .regular)
+                HStack(spacing: 6) {
+                    if build.isActive {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.tint)
+                    }
+                    Text(build.displayName)
+                        .fontWeight(build.isActive ? .semibold : .regular)
+                }
                 Text(build.kind.displayName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -238,8 +248,14 @@ struct WineManagerView: View {
         }
         return HStack {
             VStack(alignment: .leading) {
-                Text(release.displayName)
-                    .fontWeight(installed?.isActive == true ? .semibold : .regular)
+                HStack(spacing: 6) {
+                    if installed?.isActive == true {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.tint)
+                    }
+                    Text(release.displayName)
+                        .fontWeight(installed?.isActive == true ? .semibold : .regular)
+                }
                 Text("\(release.assetName) - \(formatBytes(release.size))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -303,7 +319,6 @@ struct WineManagerView: View {
             operationID = nil
         }
     }
-
     private func chooseGamePortingToolkit() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -342,12 +357,20 @@ struct WineManagerView: View {
                 let (tarball, _) = try await URLSession.shared.download(from: release.downloadURL)
                 // Install without activating — the row's "Activate" button routes through
                 // run(version:), which kills bottles before swapping the active symlink.
-                try await WhiskyWineInstaller.install(
-                    from: tarball,
-                    version: release.version,
-                    kind: release.kind,
-                    activate: false
-                )
+                if release.kind == .sikarugir {
+                    try await WhiskyWineInstaller.installSikarugirEngine(
+                        from: tarball,
+                        version: release.version,
+                        activate: false
+                    )
+                } else {
+                    try await WhiskyWineInstaller.install(
+                        from: tarball,
+                        version: release.version,
+                        kind: release.kind,
+                        activate: false
+                    )
+                }
                 await load()
             } catch {
                 errorMessage = error.localizedDescription
@@ -370,12 +393,6 @@ struct WineManagerView: View {
             operationID = nil
         }
     }
-}
-
-private func formatBytes(_ bytes: Int) -> String {
-    let formatter = ByteCountFormatter()
-    formatter.countStyle = .file
-    return formatter.string(fromByteCount: Int64(bytes))
 }
 
 #Preview {

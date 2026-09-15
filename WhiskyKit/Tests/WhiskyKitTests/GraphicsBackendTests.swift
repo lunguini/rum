@@ -108,6 +108,17 @@ final class GraphicsBackendTests: XCTestCase {
         XCTAssertEqual(d3dmetal.reason, "Only 64-bit prefixes are supported by this backend.")
     }
 
+    func testGraphicsBackendErrorIncludesRecoveryAdvice() {
+        let error = GraphicsBackendError.unavailable(
+            .dxmt,
+            "Wine engine Gcenx 11.15 has no compatible DXMT payload."
+        )
+
+        XCTAssertTrue(error.localizedDescription.contains("Gcenx 11.15"))
+        XCTAssertTrue(error.localizedDescription.contains("Configuration → Runtime"))
+        XCTAssertTrue(error.localizedDescription.contains("another renderer"))
+    }
+
     func testDXMTPayloadRequiresComplete64BitLayout() throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

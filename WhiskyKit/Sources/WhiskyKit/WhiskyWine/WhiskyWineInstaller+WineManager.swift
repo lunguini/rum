@@ -108,6 +108,8 @@ public enum WineManagerError: Error, LocalizedError {
     case wineEngineNotInstalled(String)
     case noWineEngineInstalled
     case invalidWineArchive
+    case invalidGraphicsRuntimeArchive(String)
+    case sikarugirSupportNotInstalled
 
     public var errorDescription: String? {
         switch self {
@@ -127,6 +129,11 @@ public enum WineManagerError: Error, LocalizedError {
             return "No usable Wine engine is installed. Open Wine Manager to install one."
         case .invalidWineArchive:
             return "The downloaded archive does not contain a usable Wine engine."
+        case .invalidGraphicsRuntimeArchive(let name):
+            return "The downloaded archive does not contain a usable \(name) runtime."
+        case .sikarugirSupportNotInstalled:
+            return "Sikarugir support libraries could not be installed. "
+                + "Install the Sikarugir template or choose another engine."
         }
     }
 }

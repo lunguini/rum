@@ -21,6 +21,9 @@ import SemanticVersion
 import XCTest
 @testable import WhiskyKit
 
+// These tests cover the shared engine catalog, archive installation, and runtime resolution as one
+// behavior because the three pieces must stay compatible.
+// swiftlint:disable:next type_body_length
 final class WineEngineTests: XCTestCase {
     private var temporaryLibrary: URL!
 
@@ -67,6 +70,94 @@ final class WineEngineTests: XCTestCase {
         XCTAssertEqual(available.first?.kind, .sikarugir)
         XCTAssertEqual(available.first?.version, "WS12WineSikarugir10.0_6")
         XCTAssertEqual(available.first?.id, "sikarugir:WS12WineSikarugir10.0_6")
+    }
+
+    func testDXMTReleasePrefersTheBuiltinAsset() throws {
+        let release = GcenxRelease(
+            tagName: "v0.80",
+            assets: [
+                GcenxAsset(
+                    name: "dxmt-v0.80-source.tar.gz",
+                    browserDownloadUrl: "https://example.test/source.tar.gz",
+                    size: 1
+                ),
+                GcenxAsset(
+                    name: "dxmt-v0.80-builtin.tar.gz",
+                    browserDownloadUrl: "https://example.test/builtin.tar.gz",
+                    size: 2
+                )
+            ]
+        )
+
+        let available = try XCTUnwrap(WhiskyWineInstaller.availableDXMTRelease(from: release))
+
+        XCTAssertEqual(available.version, "v0.80")
+        XCTAssertEqual(available.assetName, "dxmt-v0.80-builtin.tar.gz")
+    }
+
+    func testStandaloneDXMTRootIsDiscoveredInRumLibrary() throws {
+        let runtimeRoot = temporaryLibrary.appending(path: "DXMT/dxmt-v0.80-builtin")
+        try makeDXMTPayload(at: runtimeRoot)
+
+        XCTAssertTrue(WhiskyWineInstaller.isDXMTInstalled(in: temporaryLibrary))
+        XCTAssertEqual(
+            WhiskyWineInstaller.installedDXMTRoot(in: temporaryLibrary)?.resolvingSymlinksInPath(),
+            runtimeRoot.resolvingSymlinksInPath()
+        )
+    }
+
+    func testStandaloneDXMTPayloadIsUsedAsSharedFallbackForAnEngine() throws {
+        let engineRoot = temporaryLibrary.appending(path: "engine/Wine")
+        let sharedRoot = temporaryLibrary.appending(path: "DXMT/dxmt-v0.80-builtin")
+        try makeWineExecutables(at: engineRoot)
+        try makeDXMTPayload(at: sharedRoot)
+
+        let engine = WineEngine(
+            id: "sikarugir:test",
+            name: "Sikarugir",
+            version: "test",
+            kind: .sikarugir,
+            wineURL: engineRoot,
+            wineBinaryURL: engineRoot.appending(path: "bin/wine"),
+            wineserverBinaryURL: engineRoot.appending(path: "bin/wineserver")
+        )
+        let capabilities = WhiskyWineInstaller.graphicsCapabilities(
+            for: engine,
+            in: temporaryLibrary
+        )
+
+        XCTAssertEqual(
+            capabilities.dxmtRootURL?.resolvingSymlinksInPath(),
+            sharedRoot.resolvingSymlinksInPath()
+        )
+    }
+
+    func testInstallingStandaloneDXMTPayloadWritesVersionMetadata() async throws {
+        let sourceContainer = temporaryLibrary.appending(path: "dxmt-archive-source")
+        let sourceRoot = sourceContainer.appending(path: "dxmt-v0.80-builtin")
+        try makeDXMTPayload(at: sourceRoot)
+
+        let archive = temporaryLibrary.deletingLastPathComponent().appending(path: "dxmt.tar.gz")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
+        process.arguments = [
+            "-czf", archive.path,
+            "-C", sourceContainer.path,
+            "dxmt-v0.80-builtin"
+        ]
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0)
+
+        try await WhiskyWineInstaller.installDXMT(
+            from: archive,
+            version: "v0.80",
+            in: temporaryLibrary
+        )
+
+        XCTAssertEqual(WhiskyWineInstaller.installedDXMTVersion(in: temporaryLibrary), "v0.80")
+        XCTAssertTrue(WhiskyWineInstaller.isDXMTInstalled(in: temporaryLibrary))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: archive.path))
     }
 
     func testManagedBuildMetadataKeepsSikarugirSeparateFromLegacyGcenx() throws {
@@ -245,5 +336,20 @@ final class WineEngineTests: XCTestCase {
         try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
         FileManager.default.createFile(atPath: bin.appending(path: "wine").path, contents: Data())
         FileManager.default.createFile(atPath: bin.appending(path: "wineserver").path, contents: Data())
+    }
+
+    private func makeDXMTPayload(at root: URL) throws {
+        try makeFile(root.appending(path: "x86_64-unix/winemetal.so"))
+        try makeFile(root.appending(path: "x86_64-windows/winemetal.dll"))
+        try makeFile(root.appending(path: "x86_64-windows/d3d11.dll"))
+        try makeFile(root.appending(path: "x86_64-windows/dxgi.dll"))
+    }
+
+    private func makeFile(_ url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        FileManager.default.createFile(atPath: url.path, contents: Data())
     }
 }

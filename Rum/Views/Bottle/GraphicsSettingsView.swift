@@ -23,6 +23,8 @@ struct GraphicsSettingsView: View {
     @ObservedObject var bottle: Bottle
     @Binding var isExpanded: Bool
     @State private var availability: [GraphicsBackendAvailability] = []
+    @State private var capabilities: WineGraphicsCapabilities?
+    @State private var showingWineManager = false
 
     var body: some View {
         Section("Graphics", isExpanded: $isExpanded) {
@@ -42,6 +44,16 @@ struct GraphicsSettingsView: View {
                 Text(reason)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            if bottle.settings.graphicsBackend == .dxmt,
+               availability.first(where: { $0.backend == .dxmt })?.isAvailable == false,
+               capabilities?.macDriverExportsRequiredAPI == true {
+                Button {
+                    showingWineManager = true
+                } label: {
+                    Label("Install DXMT runtime…", systemImage: "arrow.down.circle")
+                }
+                .font(.caption)
             }
             ForEach(availability.filter {
                 !$0.isAvailable && $0.backend != bottle.settings.graphicsBackend
@@ -79,6 +91,9 @@ struct GraphicsSettingsView: View {
         .onChange(of: bottle.settings.wineEngineID) { _, _ in
             loadAvailability()
         }
+        .sheet(isPresented: $showingWineManager, onDismiss: loadAvailability) {
+            WineManagerView()
+        }
     }
 
     private var selectableBackends: [GraphicsBackendAvailability] {
@@ -91,6 +106,9 @@ struct GraphicsSettingsView: View {
     }
 
     private func loadAvailability() {
+        capabilities = WhiskyWineInstaller.wineGraphicsCapabilities(
+            for: bottle.settings.wineEngineID
+        )
         availability = WhiskyWineInstaller.graphicsBackendAvailability(
             for: bottle.settings.architecture,
             engineID: bottle.settings.wineEngineID

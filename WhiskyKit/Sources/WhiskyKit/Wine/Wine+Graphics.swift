@@ -41,13 +41,19 @@ extension Wine {
         case .dxmt:
             let capabilities = WhiskyWineInstaller.graphicsCapabilities(for: engine)
             guard let root = capabilities.dxmtRootURL else {
-                throw GraphicsBackendError.unavailable(backend, "No compatible DXMT payload was found.")
+                throw GraphicsBackendError.unavailable(
+                    backend,
+                    "Wine engine \(engine.displayName) has no compatible DXMT payload."
+                )
             }
             try RendererStateStore.applyDXMT(bottle: bottle, sourceRoot: root)
         case .d3dmetal:
             let capabilities = WhiskyWineInstaller.graphicsCapabilities(for: engine)
             guard let root = capabilities.d3dmetalRootURL else {
-                throw GraphicsBackendError.unavailable(backend, "No compatible D3DMetal payload was found.")
+                throw GraphicsBackendError.unavailable(
+                    backend,
+                    "Wine engine \(engine.displayName) has no compatible D3DMetal payload."
+                )
             }
             try RendererStateStore.applyD3DMetal(bottle: bottle, sourceRoot: root)
         }
@@ -91,9 +97,10 @@ extension Wine {
             dxvkInstalled: false
         )
         guard availability.isAvailable else {
+            let reason = availability.reason ?? "No compatible runtime was found."
             throw GraphicsBackendError.unavailable(
                 backend,
-                availability.reason ?? "No compatible runtime was found."
+                "Wine engine \(engine.displayName): \(reason)"
             )
         }
     }

@@ -35,14 +35,26 @@ struct RuntimeSettingsView: View {
     var body: some View {
         Section("Runtime", isExpanded: $isExpanded) {
             Picker("Wine engine", selection: $pickerSelection) {
-                Text(globalOptionTitle)
-                    .tag(Self.followGlobalID)
+                HStack {
+                    Text(globalOptionTitle)
+                    Spacer()
+                    if pickerSelection == Self.followGlobalID {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.tint)
+                    }
+                }
+                .tag(Self.followGlobalID)
 
                 ForEach(engines) { engine in
                     HStack {
                         Text(engine.displayName)
                         Text(engine.kind.displayName)
                             .foregroundStyle(.secondary)
+                        Spacer()
+                        if pickerSelection == engine.id {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.tint)
+                        }
                     }
                     .tag(engine.id)
                     .disabled(!engine.isAvailable)

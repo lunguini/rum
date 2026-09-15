@@ -22,6 +22,7 @@
 		6E355E5829D78249002D83BE /* ConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E355E5729D78249002D83BE /* ConfigView.swift */; };
 		6EDA19000000000000000001 /* GraphicsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDA19000000000000000002 /* GraphicsSettingsView.swift */; };
 		6EDA1A000000000000000001 /* RuntimeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDA1A000000000000000002 /* RuntimeSettingsView.swift */; };
+		6EDA1B000000000000000001 /* DXMTRuntimeSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDA1B000000000000000002 /* DXMTRuntimeSection.swift */; };
 		6E355E5A29D782B2002D83BE /* ProgramsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E355E5929D782B2002D83BE /* ProgramsView.swift */; };
 		6E355E5E29D7D85D002D83BE /* ProgramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E355E5D29D7D85D002D83BE /* ProgramView.swift */; };
 		6E40495629CCA19C006E3F1B /* WhiskyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E40495529CCA19C006E3F1B /* WhiskyApp.swift */; };
@@ -130,6 +131,7 @@
 		6E355E5729D78249002D83BE /* ConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigView.swift; sourceTree = "<group>"; };
 		6EDA19000000000000000002 /* GraphicsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphicsSettingsView.swift; sourceTree = "<group>"; };
 		6EDA1A000000000000000002 /* RuntimeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSettingsView.swift; sourceTree = "<group>"; };
+		6EDA1B000000000000000002 /* DXMTRuntimeSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DXMTRuntimeSection.swift; sourceTree = "<group>"; };
 		6E355E5929D782B2002D83BE /* ProgramsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramsView.swift; sourceTree = "<group>"; };
 		6E355E5D29D7D85D002D83BE /* ProgramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramView.swift; sourceTree = "<group>"; };
 		6E40495229CCA19C006E3F1B /* Rum.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rum.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -385,6 +387,7 @@
 				6E6C0CF52A419A8300356232 /* WhiskyWineDownloadView.swift */,
 				6E6C0CF72A419A8C00356232 /* WhiskyWineInstallView.swift */,
 				6EDA18000000000000000002 /* WineManagerView.swift */,
+				6EDA1B000000000000000002 /* DXMTRuntimeSection.swift */,
 				AA1000012D0E000100000002 /* DXVKDownloadView.swift */,
 				AA1000012D0E000100000004 /* DXVKInstallView.swift */,
 			);
@@ -623,6 +626,7 @@
 				6E6C0CF42A419A7600356232 /* RosettaView.swift in Sources */,
 				6E6C0CF82A419A8C00356232 /* WhiskyWineInstallView.swift in Sources */,
 				6EDA18000000000000000001 /* WineManagerView.swift in Sources */,
+				6EDA1B000000000000000001 /* DXMTRuntimeSection.swift in Sources */,
 				AA1000012D0E000100000001 /* DXVKDownloadView.swift in Sources */,
 				AA1000012D0E000100000003 /* DXVKInstallView.swift in Sources */,
 				6365C4C12B1AA69D00AAE1FD /* Animation+Extensions.swift in Sources */,

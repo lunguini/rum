@@ -243,7 +243,10 @@ public class Wine {
         _ args: [String], bottle: Bottle?, environment: [String: String] = [:]
     ) async throws -> String {
         var result: [String] = []
-        let fileHandle = try makeFileHandle()
+        var terminationStatus: Int32 = 0
+        let startTime = Date()
+        let logFile = try makeLogFile()
+        let fileHandle = logFile.fileHandle
         fileHandle.writeApplicaitonInfo()
         var environment = environment
         var engine: WineEngine?
@@ -261,14 +264,25 @@ public class Wine {
             engine: engine
         ) {
             switch output {
-            case .started, .terminated:
+            case .started:
                 break
+            case .terminated(let processOutput):
+                terminationStatus = processOutput.terminationStatus
             case .message(let message), .error(let message):
                 result.append(message)
             }
         }
 
-        return result.joined()
+        let output = result.joined()
+        if let failure = WineLaunchFailure.failureToReport(
+            detectedFailure: WineLaunchFailure.detect(in: output, logURL: logFile.url),
+            terminationStatus: terminationStatus,
+            runtime: Date().timeIntervalSince(startTime),
+            logURL: logFile.url
+        ) {
+            throw failure
+        }
+        return output
     }
 
     public static func wineVersion() async throws -> String {
@@ -359,37 +373,5 @@ public class Wine {
         guard !environment.isEmpty else { return result }
         result.merge(environment, uniquingKeysWith: { $1 })
         return result
-    }
-}
-
-enum WineInterfaceError: Error {
-    case invalidResponce
-}
-
-enum RegistryType: String {
-    case binary = "REG_BINARY"
-    case dword = "REG_DWORD"
-    case qword = "REG_QWORD"
-    case string = "REG_SZ"
-}
-
-extension Wine {
-    public static let logsFolder = FileManager.default.urls(
-        for: .libraryDirectory, in: .userDomainMask
-    )[0].appending(path: "Logs").appending(path: Bundle.whiskyBundleIdentifier)
-
-    public static func makeFileHandle() throws -> FileHandle {
-        return try makeLogFile().fileHandle
-    }
-
-    static func makeLogFile() throws -> (url: URL, fileHandle: FileHandle) {
-        if !FileManager.default.fileExists(atPath: Self.logsFolder.path) {
-            try FileManager.default.createDirectory(at: Self.logsFolder, withIntermediateDirectories: true)
-        }
-
-        let dateString = Date.now.ISO8601Format()
-        let fileURL = Self.logsFolder.appending(path: dateString).appendingPathExtension("log")
-        try "".write(to: fileURL, atomically: true, encoding: .utf8)
-        return try (fileURL, FileHandle(forWritingTo: fileURL))
     }
 }

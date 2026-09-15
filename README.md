@@ -27,6 +27,9 @@ Rum does not download or redistribute Apple's D3DMetal runtime. Import a compati
 Wine Manager keeps Gcenx and Sikarugir engines side by side. Install an engine once, then choose
 the engine for each bottle under Configuration → Runtime. Existing bottles follow the global
 default until they are pinned; changing the global default does not rewrite bottle selections.
+Sikarugir engine archives provide the Wine tree; DXMT is installed separately from Wine Manager
+as a shared renderer payload from the [official DXMT releases](https://github.com/3Shain/dxmt/releases)
+and is enabled only when the selected Wine tree is compatible.
 
 ### Automated renderer validation
 

@@ -88,12 +88,30 @@ public enum GraphicsBackendError: Error, LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .unavailable(let backend, let reason):
-            return "\(backend.displayName) is unavailable: \(reason)"
+            return "\(backend.displayName) is unavailable: \(reason) \(recoveryAdvice)"
         case .unsupportedArchitecture(let backend, let architecture):
-            return "\(backend.displayName) does not support \(architecture.pretty()) bottles."
+            return "\(backend.displayName) does not support \(architecture.pretty()) bottles. "
+                + "Use a 64-bit bottle or choose WineD3D/DXVK."
         case .conflictingBackend(let bottlePath, let active, let requested):
             return "Bottle \(bottlePath) is already running with \(active.displayName); "
                 + "cannot start \(requested.displayName) concurrently."
+        }
+    }
+
+    private var recoveryAdvice: String {
+        switch self {
+        case .unavailable(let backend, _):
+            switch backend {
+            case .wineD3D:
+                return ""
+            case .dxvk:
+                return "Install DXVK or choose WineD3D."
+            case .dxmt, .d3dmetal:
+                return "Select a Wine engine with Metal support in Configuration → Runtime, "
+                    + "or choose another renderer."
+            }
+        case .unsupportedArchitecture, .conflictingBackend:
+            return ""
         }
     }
 }
