@@ -63,29 +63,28 @@ struct GraphicsSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Toggle(isOn: $bottle.settings.dxvkAsync) {
-                Text("config.dxvk.async")
-            }
-            .disabled(bottle.settings.graphicsBackend != .dxvk)
-
-            Picker("config.dxvkHud", selection: $bottle.settings.dxvkHud) {
-                Text("config.dxvkHud.full").tag(DXVKHUD.full)
-                Text("config.dxvkHud.partial").tag(DXVKHUD.partial)
-                Text("config.dxvkHud.fps").tag(DXVKHUD.fps)
-                Text("config.dxvkHud.off").tag(DXVKHUD.off)
-            }
-            .disabled(bottle.settings.graphicsBackend != .dxvk)
-
-            Picker(selection: $bottle.settings.dxvkFrameRate) {
-                Text("config.dxvkFrameRate.unlimited").tag(0)
-                ForEach([30, 60, 90, 120, 144, 240], id: \.self) { fps in
-                    Text("\(fps) FPS").tag(fps)
+            if bottle.settings.graphicsBackend == .dxvk {
+                Toggle(isOn: $bottle.settings.dxvkAsync) {
+                    Text("config.dxvk.async")
                 }
-            } label: {
-                Text("config.dxvkFrameRate")
-                Text("config.dxvkFrameRate.info")
+
+                Picker("config.dxvkHud", selection: $bottle.settings.dxvkHud) {
+                    Text("config.dxvkHud.full").tag(DXVKHUD.full)
+                    Text("config.dxvkHud.partial").tag(DXVKHUD.partial)
+                    Text("config.dxvkHud.fps").tag(DXVKHUD.fps)
+                    Text("config.dxvkHud.off").tag(DXVKHUD.off)
+                }
+
+                Picker(selection: $bottle.settings.dxvkFrameRate) {
+                    Text("config.dxvkFrameRate.unlimited").tag(0)
+                    ForEach([30, 60, 90, 120, 144, 240], id: \.self) { fps in
+                        Text("\(fps) FPS").tag(fps)
+                    }
+                } label: {
+                    Text("config.dxvkFrameRate")
+                    Text("config.dxvkFrameRate.info")
+                }
             }
-            .disabled(bottle.settings.graphicsBackend != .dxvk)
         }
         .onAppear(perform: loadAvailability)
         .onChange(of: bottle.settings.wineEngineID) { _, _ in
