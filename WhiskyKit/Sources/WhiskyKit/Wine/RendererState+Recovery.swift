@@ -78,10 +78,10 @@ extension RendererStateStore {
         }
     }
 
-    /// Managed Wine engines can repopulate a prefix's system32 directories during `wineboot`.
-    /// Treating those known engine copies as arbitrary user edits leaves a renderer manifest
-    /// permanently stuck and prevents switching backends. They are safe to reconcile because the
-    /// bytes are read directly from the selected engine; unknown replacements remain protected.
+    /// Wine engines can repopulate a prefix's system32 directories during `wineboot`. Treating
+    /// those known engine copies as arbitrary user edits leaves a renderer manifest permanently
+    /// stuck and prevents switching backends. They are safe to reconcile because the bytes are
+    /// read directly from the selected engine; unknown replacements remain protected.
     private static func fileMatchesInstalledRenderer(
         _ file: RendererFileState,
         at destinationURL: URL,
@@ -96,8 +96,7 @@ extension RendererStateStore {
             return true
         }
 
-        guard let engine,
-              engine.kind.isManaged else {
+        guard let engine else {
             return false
         }
 

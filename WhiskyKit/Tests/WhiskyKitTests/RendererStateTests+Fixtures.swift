@@ -75,7 +75,7 @@ extension RendererStateTests {
         )
     }
 
-    func makeManagedEngine(at root: URL) throws -> WineEngine {
+    func makeEngine(at root: URL, kind: WineEngineKind = .sikarugir) throws -> WineEngine {
         try makeFileWithData(root.appending(path: "bin/wine"), data: "wine")
         try makeFileWithData(root.appending(path: "bin/wineserver"), data: "wineserver")
         for (architecture, suffix) in [("x86_64-windows", "x64"), ("i386-windows", "x86")] {
@@ -87,10 +87,10 @@ extension RendererStateTests {
             }
         }
         return WineEngine(
-            id: "sikarugir:test",
-            name: "Sikarugir",
+            id: "\(kind.rawValue):test",
+            name: kind.displayName,
             version: "test",
-            kind: .sikarugir,
+            kind: kind,
             wineURL: root,
             wineBinaryURL: root.appending(path: "bin/wine"),
             wineserverBinaryURL: root.appending(path: "bin/wineserver")

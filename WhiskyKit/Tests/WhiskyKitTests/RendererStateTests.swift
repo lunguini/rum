@@ -93,7 +93,7 @@ final class RendererStateTests: XCTestCase {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let engineRoot = fixture.root.appending(path: "engine")
-        let engine = try makeManagedEngine(at: engineRoot)
+        let engine = try makeEngine(at: engineRoot)
 
         try RendererStateStore.applyDXMT(
             bottle: fixture.bottle,
@@ -134,11 +134,38 @@ final class RendererStateTests: XCTestCase {
         )
     }
 
+    func testExternalEngineRefreshDoesNotBlockRendererSwitch() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let engineRoot = fixture.root.appending(path: "engine")
+        let engine = try makeEngine(at: engineRoot, kind: .crossOver)
+
+        try RendererStateStore.applyDXMT(
+            bottle: fixture.bottle,
+            sourceRoot: fixture.dxmtRoot,
+            engine: engine
+        )
+        try simulateManagedEngineRefresh(in: fixture, engineRoot: engineRoot)
+        try RendererStateStore.applyD3DMetal(
+            bottle: fixture.bottle,
+            sourceRoot: fixture.d3dmetalRoot,
+            engine: engine
+        )
+
+        try assertFile(fixture.system32.appending(path: "d3d11.dll"), equals: "d3dmetal-d3d11")
+        try assertFile(fixture.system32.appending(path: "dxgi.dll"), equals: "d3dmetal-dxgi")
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: fixture.system32.appending(path: "d3d10core.dll").path
+            )
+        )
+    }
+
     func testManagedEngineRecoveryStillRejectsUnknownReplacement() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let engineRoot = fixture.root.appending(path: "engine")
-        let engine = try makeManagedEngine(at: engineRoot)
+        let engine = try makeEngine(at: engineRoot)
 
         try RendererStateStore.applyDXMT(
             bottle: fixture.bottle,
