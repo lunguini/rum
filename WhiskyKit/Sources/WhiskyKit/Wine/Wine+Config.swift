@@ -1,0 +1,175 @@
+//
+//  Wine+Config.swift
+//  Whisky
+//
+//  This file is part of Whisky.
+//
+//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Whisky.
+//  If not, see https://www.gnu.org/licenses/.
+//
+
+import Foundation
+
+extension Wine {
+    private enum RegistryKey: String {
+        case currentVersion = #"HKLM\Software\Microsoft\Windows NT\CurrentVersion"#
+        case macDriver = #"HKCU\Software\Wine\Mac Driver"#
+        case desktop = #"HKCU\Control Panel\Desktop"#
+        case explorer = #"HKCU\Software\Wine\Explorer"#
+        case explorerDesktops = #"HKCU\Software\Wine\Explorer\Desktops"#
+    }
+
+    private static func addRegistryKey(
+        bottle: Bottle, key: String, name: String, data: String, type: RegistryType
+    ) async throws {
+        try await runWine(
+            ["reg", "add", key, "-v", name, "-t", type.rawValue, "-d", data, "-f"],
+            bottle: bottle
+        )
+    }
+
+    private static func queryRegistryKey(
+        bottle: Bottle, key: String, name: String, type: RegistryType
+    ) async throws -> String? {
+        let output = try await runWine(["reg", "query", key, "-v", name], bottle: bottle)
+        let lines = output.split(omittingEmptySubsequences: true, whereSeparator: \.isNewline)
+
+        guard let line = lines.first(where: { $0.contains(type.rawValue) }) else { return nil }
+        let array = line.split(omittingEmptySubsequences: true, whereSeparator: \.isWhitespace)
+        guard let value = array.last else { return nil }
+        return String(value)
+    }
+
+    private static func deleteRegistryKey(
+        bottle: Bottle, key: String, name: String
+    ) async throws {
+        try await runWine(["reg", "delete", key, "-v", name, "-f"], bottle: bottle)
+    }
+
+    public static func changeBuildVersion(bottle: Bottle, version: Int) async throws {
+        try await addRegistryKey(bottle: bottle, key: RegistryKey.currentVersion.rawValue,
+                                name: "CurrentBuild", data: "\(version)", type: .string)
+        try await addRegistryKey(bottle: bottle, key: RegistryKey.currentVersion.rawValue,
+                                name: "CurrentBuildNumber", data: "\(version)", type: .string)
+    }
+
+    public static func winVersion(bottle: Bottle) async throws -> WinVersion {
+        let output = try await Wine.runWine(["winecfg", "-v"], bottle: bottle)
+        let lines = output.split(whereSeparator: \.isNewline)
+
+        if let lastLine = lines.last {
+            let winString = String(lastLine)
+
+            if let version = WinVersion(rawValue: winString) {
+                return version
+            }
+        }
+
+        throw WineInterfaceError.invalidResponce
+    }
+
+    public static func buildVersion(bottle: Bottle) async throws -> String? {
+        return try await Wine.queryRegistryKey(
+            bottle: bottle, key: RegistryKey.currentVersion.rawValue,
+            name: "CurrentBuild", type: .string
+        )
+    }
+
+    public static func retinaMode(bottle: Bottle) async throws -> Bool {
+        let values: Set<String> = ["y", "n"]
+        guard let output = try await Wine.queryRegistryKey(
+            bottle: bottle, key: RegistryKey.macDriver.rawValue, name: "RetinaMode", type: .string
+        ), values.contains(output) else {
+            try await changeRetinaMode(bottle: bottle, retinaMode: false)
+            return false
+        }
+        return output == "y"
+    }
+
+    public static func changeRetinaMode(bottle: Bottle, retinaMode: Bool) async throws {
+        try await Wine.addRegistryKey(
+            bottle: bottle, key: RegistryKey.macDriver.rawValue, name: "RetinaMode", data: retinaMode ? "y" : "n",
+            type: .string
+        )
+    }
+
+    public static func dpiResolution(bottle: Bottle) async throws -> Int? {
+        guard let output = try await Wine.queryRegistryKey(bottle: bottle, key: RegistryKey.desktop.rawValue,
+                                                     name: "LogPixels", type: .dword
+        ) else { return nil }
+
+        let noPrefix = output.replacingOccurrences(of: "0x", with: "")
+        let int = Int(noPrefix, radix: 16)
+        guard let int = int else { return nil }
+        return int
+    }
+
+    public static func changeDpiResolution(bottle: Bottle, dpi: Int) async throws {
+        try await Wine.addRegistryKey(
+            bottle: bottle, key: RegistryKey.desktop.rawValue, name: "LogPixels", data: String(dpi),
+            type: .dword
+        )
+    }
+
+    /// Reads the emulated virtual desktop state. Returns whether it is enabled and, if so, its `WIDTHxHEIGHT`
+    /// resolution string. A bottle that has never configured a virtual desktop reads back as disabled.
+    public static func virtualDesktop(bottle: Bottle) async throws -> (enabled: Bool, resolution: String?) {
+        guard let name = try await Wine.queryRegistryKey(
+            bottle: bottle, key: RegistryKey.explorer.rawValue, name: "Desktop", type: .string
+        ), !name.isEmpty else {
+            return (false, nil)
+        }
+        let resolution = try await Wine.queryRegistryKey(
+            bottle: bottle, key: RegistryKey.explorerDesktops.rawValue, name: name, type: .string
+        )
+        return (true, resolution)
+    }
+
+    /// Enables or disables the emulated virtual desktop by writing the `Explorer` registry keys directly,
+    /// independent of winecfg. The desktop name is fixed to `Default` for parity with winecfg.
+    public static func changeVirtualDesktop(bottle: Bottle, enabled: Bool, resolution: String) async throws {
+        if enabled {
+            try await Wine.addRegistryKey(
+                bottle: bottle, key: RegistryKey.explorer.rawValue,
+                name: "Desktop", data: "Default", type: .string
+            )
+            try await Wine.addRegistryKey(
+                bottle: bottle, key: RegistryKey.explorerDesktops.rawValue,
+                name: "Default", data: resolution, type: .string
+            )
+        } else {
+            // Leave the size under Explorer\Desktops in place (harmless); just clear the active desktop.
+            try await Wine.deleteRegistryKey(
+                bottle: bottle, key: RegistryKey.explorer.rawValue, name: "Desktop"
+            )
+        }
+    }
+
+    @discardableResult
+    public static func control(bottle: Bottle) async throws -> String {
+        return try await Wine.runWine(["control"], bottle: bottle)
+    }
+
+    @discardableResult
+    public static func regedit(bottle: Bottle) async throws -> String {
+        return try await Wine.runWine(["regedit"], bottle: bottle)
+    }
+
+    @discardableResult
+    public static func cfg(bottle: Bottle) async throws -> String {
+        return try await Wine.runWine(["winecfg"], bottle: bottle)
+    }
+
+    @discardableResult
+    public static func changeWinVersion(bottle: Bottle, win: WinVersion) async throws -> String {
+        return try await Wine.runWine(["winecfg", "-v", win.rawValue], bottle: bottle)
+    }
+}

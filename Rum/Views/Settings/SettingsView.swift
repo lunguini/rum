@@ -24,6 +24,8 @@ struct SettingsView: View {
     @AppStorage("killOnTerminate") var killOnTerminate = true
     @AppStorage("checkWhiskyWineUpdates") var checkWhiskyWineUpdates = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
+    @State private var showWineManager = false
+    @State private var activeWineVersion = WhiskyWineInstaller.installedWineVersion()
 
     var body: some View {
         Form {
@@ -51,10 +53,37 @@ struct SettingsView: View {
                 Toggle("settings.toggle.whisky.updates", isOn: $whiskyUpdate)
                 Toggle("settings.toggle.whiskywine.updates", isOn: $checkWhiskyWineUpdates)
             }
+            Section("Wine") {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Wine Manager")
+                        Text(activeWineVersion.map { "Global default: \($0)" } ?? "No global Wine default")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Manage") {
+                        showWineManager = true
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
         .frame(width: ViewWidth.medium)
+        .onAppear {
+            refreshActiveWineVersion()
+        }
+        .sheet(isPresented: $showWineManager) {
+            WineManagerView()
+                .onDisappear {
+                    refreshActiveWineVersion()
+                }
+        }
+    }
+
+    private func refreshActiveWineVersion() {
+        activeWineVersion = WhiskyWineInstaller.installedWineVersion()
     }
 }
 

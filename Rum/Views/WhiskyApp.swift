@@ -112,13 +112,46 @@ struct WhiskyApp: App {
     }
 
     static func killBottles() {
-        for bottle in BottleVM.shared.bottles {
+        Task {
+            await killBottlesAndWait()
+        }
+    }
+
+    static func killBottlesAndWait() async {
+        let bottles = await MainActor.run {
+            BottleVM.shared.bottles
+        }
+        await killBottles(bottles)
+    }
+
+    private static func killBottles(_ bottles: [Bottle]) async {
+        for bottle in bottles {
             do {
-                try Wine.killBottle(bottle: bottle)
+                try await Wine.killBottleAndWait(bottle: bottle)
             } catch {
                 print("Failed to kill bottle: \(error)")
             }
         }
+    }
+
+    /// Synchronously kill every bottle, bounded by `timeout`.
+    ///
+    /// Intended for `applicationWillTerminate`, where the process exits the moment the delegate
+    /// returns and the run loop will never service a plain `Task`. Must be called on the main
+    /// thread: the bottles list is read synchronously here (we are already main-actor isolated) and
+    /// the actual `wineserver -k` work runs on a detached task, so blocking the main thread on the
+    /// semaphore cannot deadlock against a `MainActor.run` hop.
+    @MainActor
+    static func killBottlesAndWaitBlocking(timeout: TimeInterval = 5) {
+        let bottles = BottleVM.shared.bottles
+        guard !bottles.isEmpty else { return }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        Task.detached(priority: .userInitiated) {
+            await killBottles(bottles)
+            semaphore.signal()
+        }
+        _ = semaphore.wait(timeout: .now() + timeout)
     }
 
     static func openLogsFolder() {
@@ -177,12 +210,9 @@ struct WhiskyApp: App {
             }
         }()
         guard let getconfOutputString = String(data: getconfOutput, encoding: .utf8) else {return}
-        let d3dmPath = URL(fileURLWithPath: getconfOutputString.trimmingCharacters(in: .whitespacesAndNewlines))
-            .appending(path: "d3dm").path
-        do {
-            try FileManager.default.removeItem(atPath: d3dmPath)
-        } catch {
-            return
+        let cacheRoot = URL(fileURLWithPath: getconfOutputString.trimmingCharacters(in: .whitespacesAndNewlines))
+        for cacheName in ["d3dm", "dxmt"] {
+            try? FileManager.default.removeItem(at: cacheRoot.appending(path: cacheName))
         }
     }
 }

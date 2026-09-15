@@ -20,33 +20,102 @@ import Foundation
 
 extension FileManager {
     func replaceDLLs(
-        in destinationDirectory: URL, withContentsIn sourceDirectory: URL, makeOriginalCopy: Bool = false
+        in destinationDirectory: URL, withContentsIn sourceDirectory: URL, makeOriginalCopy: Bool = true
     ) throws {
         let enumerator = FileManager.default.enumerator(
             at: sourceDirectory, includingPropertiesForKeys: [.isRegularFileKey])
 
         while let fileURL = enumerator?.nextObject() as? URL {
-            guard fileURL.pathExtension == "dll" else { return }
+            guard fileURL.pathExtension == "dll" else { continue }
             let originalURL = destinationDirectory.appending(path: fileURL.lastPathComponent)
             try FileManager.default.replaceFile(at: originalURL, with: fileURL, makeOriginalCopy: makeOriginalCopy)
         }
     }
 
-    func replaceFile(at originalURL: URL, with replacementURL: URL, makeOriginalCopy: Bool = true) throws {
-        if fileExists(atPath: originalURL.path(percentEncoded: false)) {
-            if makeOriginalCopy {
-                let copyURL = originalURL.appendingPathExtension("orig")
+    /// Restore DLLs previously replaced by `replaceDLLs`. A replacement is only removed when the
+    /// destination still matches the replacement byte-for-byte; this prevents a later user change
+    /// from being silently destroyed.
+    func restoreDLLs(
+        in destinationDirectory: URL, from sourceDirectory: URL
+    ) throws {
+        let enumerator = FileManager.default.enumerator(
+            at: sourceDirectory, includingPropertiesForKeys: [.isRegularFileKey]
+        )
 
-                if fileExists(atPath: copyURL.path(percentEncoded: false)) {
-                    try FileManager.default.removeItem(at: copyURL)
-                }
+        while let fileURL = enumerator?.nextObject() as? URL {
+            guard fileURL.pathExtension == "dll" else { continue }
+            let destinationURL = destinationDirectory.appending(path: fileURL.lastPathComponent)
+            let originalURL = destinationURL.appendingPathExtension("orig")
+            let replacementMatches = sameContents(at: destinationURL, and: fileURL)
 
-                try FileManager.default.moveItem(at: originalURL, to: copyURL)
-            } else {
-                try FileManager.default.removeItem(at: originalURL)
+            guard replacementMatches || fileExists(atPath: originalURL.path(percentEncoded: false)) else {
+                continue
             }
 
-            try FileManager.default.copyItem(at: replacementURL, to: originalURL)
+            if !replacementMatches {
+                throw RendererStateError.userModifiedFile(destinationURL.path(percentEncoded: false))
+            }
+
+            if fileExists(atPath: originalURL.path(percentEncoded: false)) {
+                try? removeItem(at: destinationURL)
+                try moveItem(at: originalURL, to: destinationURL)
+            } else {
+                try? removeItem(at: destinationURL)
+            }
         }
+    }
+
+    func replaceFile(at originalURL: URL, with replacementURL: URL, makeOriginalCopy: Bool = true) throws {
+        guard fileExists(atPath: replacementURL.path(percentEncoded: false)) else {
+            throw RendererStateError.missingReplacementFile(replacementURL.path(percentEncoded: false))
+        }
+
+        if sameContents(at: originalURL, and: replacementURL) {
+            return
+        }
+
+        let copyURL = originalURL.appendingPathExtension("orig")
+        let temporaryURL = originalURL.appendingPathExtension("tmp-\(UUID().uuidString)")
+        var movedOriginal = false
+
+        if makeOriginalCopy,
+           !fileExists(atPath: originalURL.path(percentEncoded: false)),
+           fileExists(atPath: copyURL.path(percentEncoded: false)) {
+            throw RendererStateError.userModifiedFile(copyURL.path(percentEncoded: false))
+        }
+
+        do {
+            try copyItem(at: replacementURL, to: temporaryURL)
+
+            if fileExists(atPath: originalURL.path(percentEncoded: false)) {
+                if makeOriginalCopy {
+                    if fileExists(atPath: copyURL.path(percentEncoded: false)) {
+                        throw RendererStateError.userModifiedFile(originalURL.path(percentEncoded: false))
+                    }
+                    try moveItem(at: originalURL, to: copyURL)
+                    movedOriginal = true
+                } else {
+                    try removeItem(at: originalURL)
+                }
+            }
+
+            try moveItem(at: temporaryURL, to: originalURL)
+        } catch {
+            try? removeItem(at: temporaryURL)
+            if movedOriginal, !fileExists(atPath: originalURL.path(percentEncoded: false)) {
+                try? moveItem(at: copyURL, to: originalURL)
+            }
+            throw error
+        }
+    }
+
+    private func sameContents(at lhs: URL, and rhs: URL) -> Bool {
+        guard fileExists(atPath: lhs.path(percentEncoded: false)),
+              fileExists(atPath: rhs.path(percentEncoded: false)),
+              let lhsData = try? Data(contentsOf: lhs),
+              let rhsData = try? Data(contentsOf: rhs) else {
+            return false
+        }
+        return lhsData == rhsData
     }
 }

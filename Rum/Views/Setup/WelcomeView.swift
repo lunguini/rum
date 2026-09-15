@@ -24,6 +24,7 @@ struct WelcomeView: View {
     @State var whiskyWineInstalled: Bool?
     @State var dxvkInstalled: Bool?
     @State var shouldCheckInstallStatus: Bool = false
+    @State private var showWineManager = false
     @Binding var path: [SetupStage]
     @Binding var showSetup: Bool
     var firstTime: Bool
@@ -34,10 +35,13 @@ struct WelcomeView: View {
         && dxvkInstalled == true
     }
 
-    private var anyMissing: Bool {
+    private var requiredDependenciesInstalled: Bool {
+        rosettaInstalled == true && whiskyWineInstalled == true
+    }
+
+    private var anyRequiredMissing: Bool {
         rosettaInstalled == false
         || whiskyWineInstalled == false
-        || dxvkInstalled == false
     }
 
     var body: some View {
@@ -68,6 +72,9 @@ struct WelcomeView: View {
                 InstallStatusView(isInstalled: $whiskyWineInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
                                   showUninstall: true,
+                                  manageAction: {
+                                      showWineManager = true
+                                  },
                                   name: "Wine")
                 InstallStatusView(isInstalled: $dxvkInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
@@ -86,36 +93,37 @@ struct WelcomeView: View {
                 if rosettaInstalled != nil,
                    whiskyWineInstalled != nil,
                    dxvkInstalled != nil {
-                    if anyMissing {
+                    if anyRequiredMissing {
                         Button("setup.quit") {
                             exit(0)
                         }
                         .keyboardShortcut(.cancelAction)
                     }
                     Spacer()
-                    Button(allInstalled ? "setup.done" : "setup.next") {
-                        if rosettaInstalled == false {
-                            path.append(.rosetta)
-                            return
-                        }
-
-                        if whiskyWineInstalled == false {
-                            path.append(.whiskyWineDownload)
-                            return
-                        }
-
-                        if dxvkInstalled == false {
+                    if requiredDependenciesInstalled && dxvkInstalled == false {
+                        Button("setup.next") {
                             path.append(.dxvkDownload)
-                            return
                         }
-
-                        showSetup = false
+                        Button("setup.done") {
+                            showSetup = false
+                        }
+                        .keyboardShortcut(.defaultAction)
+                    } else {
+                        Button(allInstalled ? "setup.done" : "setup.next") {
+                            advanceSetup()
+                        }
+                        .keyboardShortcut(.defaultAction)
                     }
-                    .keyboardShortcut(.defaultAction)
                 }
             }
         }
         .frame(width: 400, height: 250)
+        .sheet(isPresented: $showWineManager) {
+            WineManagerView()
+                .onDisappear {
+                    shouldCheckInstallStatus.toggle()
+                }
+        }
     }
 
     func checkInstallStatus() {
@@ -123,12 +131,32 @@ struct WelcomeView: View {
         whiskyWineInstalled = WhiskyWineInstaller.isWhiskyWineInstalled()
         dxvkInstalled = WhiskyWineInstaller.isDXVKInstalled()
     }
+
+    private func advanceSetup() {
+        if rosettaInstalled == false {
+            path.append(.rosetta)
+            return
+        }
+
+        if whiskyWineInstalled == false {
+            path.append(.whiskyWineDownload)
+            return
+        }
+
+        if dxvkInstalled == false {
+            path.append(.dxvkDownload)
+            return
+        }
+
+        showSetup = false
+    }
 }
 
 struct InstallStatusView: View {
     @Binding var isInstalled: Bool?
     @Binding var shouldCheckInstallStatus: Bool
     @State var showUninstall: Bool = false
+    var manageAction: (() -> Void)?
     @State var name: String
     @State var text: String = String(localized: "setup.install.checking")
 
@@ -148,6 +176,11 @@ struct InstallStatusView: View {
             Spacer()
             if let installed = isInstalled {
                 if installed && showUninstall {
+                    if let manageAction {
+                        Button("Manage") {
+                            manageAction()
+                        }
+                    }
                     Button("setup.uninstall") {
                         uninstall()
                     }

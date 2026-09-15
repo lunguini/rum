@@ -56,60 +56,107 @@ public class WhiskyWineInstaller {
     /// URL to the installed `wine` `bin` directory
     public static let binFolder: URL = libraryFolder.appending(path: "Wine").appending(path: "bin")
 
-    private static let versionFile = libraryFolder.appending(path: "wine-version.json")
-
-    private static let githubReleasesURL =
-        "https://api.github.com/repos/Gcenx/macOS_Wine_builds/releases"
-
     public static func isWhiskyWineInstalled() -> Bool {
         return installedWineVersion() != nil
     }
 
-    public static func install(from tarball: URL) {
+    /// Install a Wine build from a downloaded tarball.
+    ///
+    /// This performs a large, synchronous tar extraction. It is a `nonisolated async`
+    /// function, so calling it from a `@MainActor` context suspends and runs the blocking
+    /// work on the cooperative thread pool rather than freezing the UI.
+    ///
+    /// - Parameter kind: The managed engine family represented by the archive.
+    /// - Parameter activate: When `true`, the newly installed build becomes the global default.
+    ///   Pass `false` to install without switching the active engine; this is what the manager
+    ///   uses so installing an engine never changes existing bottles unexpectedly.
+    public static func install(
+        from tarball: URL,
+        version: String,
+        kind: WineEngineKind = .gcenx,
+        activate: Bool = true,
+        in libraryFolder: URL = WhiskyWineInstaller.libraryFolder
+    ) async throws {
+        guard kind.isManaged else {
+            throw WineManagerError.invalidWineArchive
+        }
+
+        let tempDir = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString)
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Extract the tar.xz to a temp directory
+        try Tar.untarXZ(tarBall: tarball, toURL: tempDir)
+
+        // Gcenx archives contain a Wine .app, while Sikarugir engine archives contain a
+        // `wswine.bundle`. Both are accepted by looking for the root that owns bin/wine and
+        // bin/wineserver instead of depending on either wrapper name.
+        guard let extractedWine = findWineRoot(in: tempDir) else {
+            throw WineManagerError.invalidWineArchive
+        }
+
+        // Ensure Libraries folder exists.
+        let wineDestination = wineURL(for: version, kind: kind, in: libraryFolder)
+        let destinationDirectory = wineDestination.deletingLastPathComponent()
+        if !FileManager.default.fileExists(atPath: libraryFolder.path) {
+            try FileManager.default.createDirectory(at: libraryFolder, withIntermediateDirectories: true)
+        }
+        let buildsDirectory = destinationDirectory.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: buildsDirectory, withIntermediateDirectories: true)
+
+        let engineID = WineEngine.managedID(kind: kind, version: version)
+        let wasActive = activeWineEngineID(in: libraryFolder) == engineID
+        let backupDirectory = buildsDirectory.appending(path: ".backup-\(UUID().uuidString)")
+        if FileManager.default.fileExists(atPath: destinationDirectory.path) {
+            try FileManager.default.moveItem(at: destinationDirectory, to: backupDirectory)
+        }
+
         do {
-            let tempDir = FileManager.default.temporaryDirectory
-                .appending(path: UUID().uuidString)
-
-            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-
-            // Extract the tar.xz to a temp directory
-            try Tar.untarXZ(tarBall: tarball, toURL: tempDir)
-
-            // Gcenx archives extract to "Wine Staging.app/Contents/Resources/wine/"
-            // or "Wine Devel.app/Contents/Resources/wine/" — find the .app dynamically
-            let contents = try FileManager.default.contentsOfDirectory(
-                at: tempDir, includingPropertiesForKeys: nil
-            )
-            guard let appBundle = contents.first(where: { $0.lastPathComponent.hasSuffix(".app") }) else {
-                throw "No .app bundle found in extracted archive"
-            }
-            let extractedWine = appBundle
-                .appending(path: "Contents")
-                .appending(path: "Resources")
-                .appending(path: "wine")
-
-            // Ensure application folder exists
-            if !FileManager.default.fileExists(atPath: applicationFolder.path) {
-                try FileManager.default.createDirectory(at: applicationFolder, withIntermediateDirectories: true)
-            }
-
-            // Ensure Libraries folder exists (clean)
-            let wineDestination = libraryFolder.appending(path: "Wine")
-            if FileManager.default.fileExists(atPath: wineDestination.path) {
-                try FileManager.default.removeItem(at: wineDestination)
-            }
-            if !FileManager.default.fileExists(atPath: libraryFolder.path) {
-                try FileManager.default.createDirectory(at: libraryFolder, withIntermediateDirectories: true)
-            }
-
-            // Move wine resources -> Libraries/Wine
+            try FileManager.default.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+            // Move Wine resources -> Libraries/WineBuilds/{engine}/Wine.
             try FileManager.default.moveItem(at: extractedWine, to: wineDestination)
+            try writeEngineMetadata(
+                InstalledWineEngineMetadata(
+                    id: engineID,
+                    name: kind.displayName,
+                    version: version,
+                    kind: kind
+                ),
+                at: destinationDirectory
+            )
 
-            // Clean up
-            try FileManager.default.removeItem(at: tempDir)
-            try FileManager.default.removeItem(at: tarball)
+            if activate || wasActive {
+                try activateWineEngine(engineID, in: libraryFolder)
+            }
+            try? FileManager.default.removeItem(at: backupDirectory)
         } catch {
-            print("Failed to install Wine: \(error)")
+            try? FileManager.default.removeItem(at: destinationDirectory)
+            if FileManager.default.fileExists(atPath: backupDirectory.path) {
+                try? FileManager.default.moveItem(at: backupDirectory, to: destinationDirectory)
+            }
+            throw error
+        }
+
+        // Clean up
+        try? FileManager.default.removeItem(at: tarball)
+    }
+    /// Locate a Wine root in either a Gcenx application archive or a Wineskin-compatible engine
+    /// bundle. Kept separate from extraction so archive layout regressions are unit-testable.
+    static func findWineRoot(in extractedDirectory: URL) -> URL? {
+        let fileManager = FileManager.default
+        let candidates = [extractedDirectory] + (fileManager
+            .enumerator(at: extractedDirectory, includingPropertiesForKeys: [.isDirectoryKey])?
+            .compactMap { $0 as? URL } ?? [])
+
+        return candidates.first { candidate in
+            let wine = candidate.appending(path: "bin/wine")
+            let wine64 = candidate.appending(path: "bin/wine64")
+            let wineserver = candidate.appending(path: "bin/wineserver")
+            return (fileManager.fileExists(atPath: wine.path)
+                    || fileManager.fileExists(atPath: wine64.path))
+                && fileManager.fileExists(atPath: wineserver.path)
         }
     }
 
@@ -121,72 +168,6 @@ public class WhiskyWineInstaller {
         }
     }
 
-    /// Save the installed version string to disk
-    public static func saveInstalledVersion(_ version: String) {
-        do {
-            let info = InstalledWineVersion(version: version)
-            let data = try JSONEncoder().encode(info)
-            try data.write(to: versionFile)
-        } catch {
-            print("Failed to save wine version: \(error)")
-        }
-    }
-
-    /// Read the locally installed version string
-    public static func installedWineVersion() -> String? {
-        // Check for version file
-        if let data = try? Data(contentsOf: versionFile),
-           let info = try? JSONDecoder().decode(InstalledWineVersion.self, from: data) {
-            return info.version
-        }
-
-        // Fallback: check if a wine binary exists
-        let wineUnified = binFolder.appending(path: "wine")
-        let wineLegacy = binFolder.appending(path: "wine64")
-        if FileManager.default.fileExists(atPath: wineUnified.path)
-            || FileManager.default.fileExists(atPath: wineLegacy.path) {
-            return "unknown"
-        }
-
-        return nil
-    }
-
-    /// Fetch the latest Gcenx release that has a Wine Staging asset.
-    /// Falls back to wine-devel if no staging build is available.
-    public static func fetchLatestRelease() async -> (version: String, downloadURL: URL)? {
-        guard let url = URL(string: githubReleasesURL) else { return nil }
-
-        do {
-            var request = URLRequest(url: url)
-            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-
-            let (data, _) = try await URLSession.shared.data(for: request)
-            let releases = try JSONDecoder().decode([GcenxRelease].self, from: data)
-
-            for release in releases {
-                // Skip pre-release candidates
-                if release.tagName.contains("-rc") { continue }
-
-                // Prefer staging, fall back to devel
-                let stagingAsset = release.assets.first {
-                    $0.name.contains("wine-staging") && $0.name.hasSuffix("-osx64.tar.xz")
-                }
-                let develAsset = release.assets.first {
-                    $0.name.contains("wine-devel") && $0.name.hasSuffix("-osx64.tar.xz")
-                }
-
-                if let asset = stagingAsset ?? develAsset,
-                   let downloadURL = URL(string: asset.browserDownloadUrl) {
-                    return (release.tagName, downloadURL)
-                }
-            }
-        } catch {
-            print("Failed to fetch Gcenx releases: \(error)")
-        }
-
-        return nil
-    }
-
     // MARK: - DXVK
 
     private static let dxvkReleasesURL =
@@ -195,8 +176,24 @@ public class WhiskyWineInstaller {
     public static let dxvkFolder: URL = libraryFolder.appending(path: "DXVK")
 
     public static func isDXVKInstalled() -> Bool {
-        let x64 = dxvkFolder.appending(path: "x64")
-        return FileManager.default.fileExists(atPath: x64.path)
+        isDXVKInstalled(for: .win64, in: libraryFolder)
+    }
+
+    public static func isDXVKInstalled(for architecture: BottleArchitecture) -> Bool {
+        isDXVKInstalled(for: architecture, in: libraryFolder)
+    }
+
+    public static func isDXVKInstalled(
+        for architecture: BottleArchitecture,
+        in libraryFolder: URL
+    ) -> Bool {
+        let directory = libraryFolder
+            .appending(path: "DXVK")
+            .appending(path: architecture == .win64 ? "x64" : "x32")
+        let requiredFiles = ["d3d10core.dll", "d3d11.dll"]
+        return requiredFiles.allSatisfy {
+            FileManager.default.fileExists(atPath: directory.appending(path: $0).path)
+        }
     }
 
     /// Fetch the latest DXVK-macOS release download URL (async variant, non-builtin).
@@ -269,20 +266,32 @@ public class WhiskyWineInstaller {
 
     /// Check if a Wine update is available.
     public static func shouldUpdateWhiskyWine() async -> WineUpdateStatus {
+        // External engines and Sikarugir are deliberate runtime choices; never nag about
+        // replacing them with a Gcenx build from the legacy setup flow.
+        if let activeEngine = activeWineEngine(), activeEngine.kind != .gcenx {
+            return WineUpdateStatus(shouldUpdate: false, latestVersion: "")
+        }
+
         guard let release = await fetchLatestRelease() else {
             return WineUpdateStatus(shouldUpdate: false, latestVersion: "")
         }
 
-        guard let localVersion = installedWineVersion() else {
+        guard installedWineVersion() != nil else {
             return WineUpdateStatus(shouldUpdate: false, latestVersion: "")
         }
 
-        if localVersion == "unknown" || localVersion != release.version {
-            return WineUpdateStatus(shouldUpdate: true, latestVersion: release.version)
+        // Consider the latest release "already installed" if it's among the downloaded
+        // builds — the user may have pinned an older build as active on purpose.
+        let alreadyInstalled = installedWineBuilds().contains {
+            $0.kind == .gcenx && $0.version == release.version
+        }
+        if alreadyInstalled {
+            return WineUpdateStatus(shouldUpdate: false, latestVersion: release.version)
         }
 
-        return WineUpdateStatus(shouldUpdate: false, latestVersion: release.version)
+        return WineUpdateStatus(shouldUpdate: true, latestVersion: release.version)
     }
+
 }
 
 public struct WineUpdateStatus {

@@ -73,16 +73,28 @@ extension FileHandle {
         header += "Bottle Name: \(bottle.settings.name)\n"
         header += "Bottle URL: \(bottle.url.path)\n\n"
 
-        if let version = WhiskyWineInstaller.installedWineVersion() {
-            header += "Wine Version: \(version)\n"
+        if let installedVersion = WhiskyWineInstaller.installedWineVersion() {
+            header += "Installed Wine Version: \(installedVersion)\n"
         }
+        if let engine = try? WhiskyWineInstaller.wineEngine(for: bottle.settings.wineEngineID) {
+            header += "Wine Engine: \(engine.displayName)\n"
+            header += "Wine Engine ID: \(engine.id)\n"
+        } else if let engineID = bottle.settings.wineEngineID {
+            header += "Wine Engine: unavailable\n"
+            header += "Wine Engine ID: \(engineID)\n"
+        } else {
+            header += "Wine Engine: global default\n"
+        }
+        header += "Bottle Wine Version: \(bottle.settings.wineVersion)\n"
         header += "Windows Version: \(bottle.settings.windowsVersion)\n"
+        header += "Architecture: \(bottle.settings.architecture.rawValue)\n"
+        header += "Graphics Backend: \(bottle.settings.graphicsBackend.rawValue)\n"
         header += "Enhanced Sync: \(bottle.settings.enhancedSync)\n\n"
 
         header += "Metal HUD: \(bottle.settings.metalHud)\n"
         header += "Metal Trace: \(bottle.settings.metalTrace)\n\n"
 
-        if bottle.settings.dxvk {
+        if bottle.settings.graphicsBackend == .dxvk {
             header += "DXVK: \(bottle.settings.dxvk)\n"
             header += "DXVK Async: \(bottle.settings.dxvkAsync)\n"
             header += "DXVK HUD: \(bottle.settings.dxvkHud)\n"

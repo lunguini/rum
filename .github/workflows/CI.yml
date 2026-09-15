@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftLint
+        run: brew install swiftlint
+      - name: Lint
+        run: swiftlint --strict
+
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run WhiskyKit tests
+        run: swift test --package-path WhiskyKit
+
+  canary-harness:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate graphics canary script
+        run: bash -n scripts/graphics-canary.sh
+      - name: Run graphics canary (skip without CrossOver)
+        run: ./scripts/graphics-canary.sh
+
+  external-graphics:
+    if: ${{ vars.RUM_GRAPHICS_CANARY_ENABLED == 'true' }}
+    runs-on: [self-hosted, macOS, rum-graphics]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run required CrossOver graphics canaries
+        run: ./scripts/graphics-canary.sh --require

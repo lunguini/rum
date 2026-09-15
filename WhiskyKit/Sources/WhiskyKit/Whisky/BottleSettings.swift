@@ -103,10 +103,25 @@ public enum EnhancedSync: Codable, Equatable {
     case none, esync, msync
 }
 
+public enum BottleArchitecture: String, CaseIterable, Codable, Equatable, Sendable {
+    case win64
+    case win32
+
+    public func pretty() -> String {
+        switch self {
+        case .win64:
+            return "64-bit"
+        case .win32:
+            return "32-bit legacy"
+        }
+    }
+}
+
 public struct BottleWineConfig: Codable, Equatable {
     static let defaultWineVersion = SemanticVersion(11, 6, 0)
     var wineVersion: SemanticVersion = Self.defaultWineVersion
     var windowsVersion: WinVersion = .win10
+    var architecture: BottleArchitecture = .win64
     var enhancedSync: EnhancedSync = .msync
     var avxEnabled: Bool = false
 
@@ -117,6 +132,7 @@ public struct BottleWineConfig: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.wineVersion = try container.decodeIfPresent(SemanticVersion.self, forKey: .wineVersion) ?? Self.defaultWineVersion
         self.windowsVersion = try container.decodeIfPresent(WinVersion.self, forKey: .windowsVersion) ?? .win10
+        self.architecture = try container.decodeIfPresent(BottleArchitecture.self, forKey: .architecture) ?? .win64
         self.enhancedSync = try container.decodeIfPresent(EnhancedSync.self, forKey: .enhancedSync) ?? .msync
         self.avxEnabled = try container.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
     }
@@ -167,13 +183,20 @@ public struct BottleSettings: Codable, Equatable {
     private var info: BottleInfo
     private var wineConfig: BottleWineConfig
     private var metalConfig: BottleMetalConfig
-    private var dxvkConfig: BottleDXVKConfig
+    var dxvkConfig: BottleDXVKConfig
+    /// New renderer selection. `nil` means this is an older metadata file and the legacy `dxvk`
+    /// Boolean below is the source of truth until the bottle is explicitly migrated or edited.
+    var selectedGraphicsBackend: GraphicsBackend?
+    /// Optional engine pin. `nil` means the bottle follows Rum's global Wine default.
+    public var wineEngineID: String?
 
     public init() {
         self.info = BottleInfo()
         self.wineConfig = BottleWineConfig()
         self.metalConfig = BottleMetalConfig()
         self.dxvkConfig = BottleDXVKConfig()
+        self.selectedGraphicsBackend = nil
+        self.wineEngineID = nil
     }
 
     // swiftlint:disable line_length
@@ -184,6 +207,10 @@ public struct BottleSettings: Codable, Equatable {
         self.wineConfig = try container.decodeIfPresent(BottleWineConfig.self, forKey: .wineConfig) ?? BottleWineConfig()
         self.metalConfig = try container.decodeIfPresent(BottleMetalConfig.self, forKey: .metalConfig) ?? BottleMetalConfig()
         self.dxvkConfig = try container.decodeIfPresent(BottleDXVKConfig.self, forKey: .dxvkConfig) ?? BottleDXVKConfig()
+        self.selectedGraphicsBackend = try container.decodeIfPresent(
+            GraphicsBackend.self, forKey: .selectedGraphicsBackend
+        )
+        self.wineEngineID = try container.decodeIfPresent(String.self, forKey: .wineEngineID)
     }
     // swiftlint:enable line_length
 
@@ -203,6 +230,12 @@ public struct BottleSettings: Codable, Equatable {
     public var windowsVersion: WinVersion {
         get { return wineConfig.windowsVersion }
         set { wineConfig.windowsVersion = newValue }
+    }
+
+    /// The Wine prefix architecture selected when this bottle is created.
+    public var architecture: BottleArchitecture {
+        get { return wineConfig.architecture }
+        set { wineConfig.architecture = newValue }
     }
 
     public var avxEnabled: Bool {
@@ -248,32 +281,13 @@ public struct BottleSettings: Codable, Equatable {
         set { metalConfig.dxrEnabled = newValue }
     }
 
-    public var dxvk: Bool {
-        get { return dxvkConfig.dxvk }
-        set { dxvkConfig.dxvk = newValue }
-    }
-
-    public var dxvkAsync: Bool {
-        get { return dxvkConfig.dxvkAsync }
-        set { dxvkConfig.dxvkAsync = newValue }
-    }
-
-    public var dxvkHud: DXVKHUD {
-        get {  return dxvkConfig.dxvkHud }
-        set { dxvkConfig.dxvkHud = newValue }
-    }
-
-    /// Frame rate cap applied via `DXVK_FRAME_RATE`. `0` means unlimited.
-    public var dxvkFrameRate: Int {
-        get { return dxvkConfig.dxvkFrameRate }
-        set { dxvkConfig.dxvkFrameRate = newValue }
-    }
-
     @discardableResult
     public static func decode(from metadataURL: URL) throws -> BottleSettings {
         guard FileManager.default.fileExists(atPath: metadataURL.path(percentEncoded: false)) else {
-            let decoder = PropertyListDecoder()
-            let settings = try decoder.decode(BottleSettings.self, from: Data(contentsOf: metadataURL))
+            var settings = BottleSettings()
+            // Write the explicit default so a newly created bottle has the same schema as a
+            // migrated bottle while retaining the legacy `dxvk` field for older Rum versions.
+            settings.selectedGraphicsBackend = .dxvk
             try settings.encode(to: metadataURL)
             return settings
         }
@@ -289,11 +303,9 @@ public struct BottleSettings: Codable, Equatable {
             return settings
         }
 
-        if settings.wineConfig.wineVersion != BottleWineConfig().wineVersion {
-            Logger.wineKit.warning("Bottle has a different wine version `\(settings.wineConfig.wineVersion)`")
-            settings.wineConfig.wineVersion = BottleWineConfig().wineVersion
+        if settings.selectedGraphicsBackend == nil {
+            settings.selectedGraphicsBackend = settings.dxvkConfig.dxvk ? .dxvk : .wineD3D
             try settings.encode(to: metadataURL)
-            return settings
         }
 
         return settings
@@ -306,57 +318,4 @@ public struct BottleSettings: Codable, Equatable {
         try data.write(to: metadataUrl)
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
-    public func environmentVariables(wineEnv: inout [String: String]) {
-        if dxvk {
-            wineEnv.updateValue("dxgi,d3d9,d3d10core,d3d11=n,b", forKey: "WINEDLLOVERRIDES")
-            switch dxvkHud {
-            case .full:
-                wineEnv.updateValue("full", forKey: "DXVK_HUD")
-            case .partial:
-                wineEnv.updateValue("devinfo,fps,frametimes", forKey: "DXVK_HUD")
-            case .fps:
-                wineEnv.updateValue("fps", forKey: "DXVK_HUD")
-            case .off:
-                break
-            }
-
-            if dxvkFrameRate > 0 {
-                wineEnv.updateValue(String(dxvkFrameRate), forKey: "DXVK_FRAME_RATE")
-            }
-        }
-
-        if dxvkAsync {
-            wineEnv.updateValue("1", forKey: "DXVK_ASYNC")
-        }
-
-        switch enhancedSync {
-        case .none:
-            break
-        case .esync:
-            wineEnv.updateValue("1", forKey: "WINEESYNC")
-        case .msync:
-            wineEnv.updateValue("1", forKey: "WINEMSYNC")
-            // D3DM detects ESYNC and changes behaviour accordingly
-            // so we have to lie to it so that it doesn't break
-            // under MSYNC. Values hardcoded in lid3dshared.dylib
-            wineEnv.updateValue("1", forKey: "WINEESYNC")
-        }
-
-        if metalHud {
-            wineEnv.updateValue("1", forKey: "MTL_HUD_ENABLED")
-        }
-
-        if metalTrace {
-            wineEnv.updateValue("1", forKey: "METAL_CAPTURE_ENABLED")
-        }
-
-        if avxEnabled {
-            wineEnv.updateValue("1", forKey: "ROSETTA_ADVERTISE_AVX")
-        }
-
-        if dxrEnabled {
-            wineEnv.updateValue("1", forKey: "D3DM_SUPPORT_DXR")
-        }
-    }
 }

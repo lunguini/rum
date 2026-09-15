@@ -24,9 +24,11 @@ struct BottleCreationView: View {
 
     @State private var newBottleName: String = ""
     @State private var newBottleVersion: WinVersion = .win10
+    @State private var newBottleArchitecture: BottleArchitecture = .win64
     @State private var newBottleURL: URL = UserDefaults.standard.url(forKey: "defaultBottleLocation")
                                            ?? BottleData.defaultBottleDir
     @State private var nameValid: Bool = false
+    @State private var supportsWin32Architecture: Bool?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -41,6 +43,28 @@ struct BottleCreationView: View {
                 Picker("create.win", selection: $newBottleVersion) {
                     ForEach(WinVersion.allCases.reversed(), id: \.self) {
                         Text($0.pretty())
+                    }
+                }
+
+                Picker("create.architecture", selection: $newBottleArchitecture) {
+                    Text(BottleArchitecture.win64.pretty()).tag(BottleArchitecture.win64)
+                    // Only offer win32 once the probe has confirmed support. While the probe is
+                    // pending (`nil`) or has resolved unsupported the option is omitted entirely,
+                    // so a fast user can't create a win32 bottle on a wow64-only Wine build.
+                    if supportsWin32Architecture == true {
+                        Text(BottleArchitecture.win32.pretty())
+                            .tag(BottleArchitecture.win32)
+                    }
+                }
+
+                if let supportsWin32Architecture, !supportsWin32Architecture {
+                    HStack(alignment: .firstTextBaseline) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .symbolRenderingMode(.multicolor)
+                            .font(.subheadline)
+                        Text("create.architecture.win32Unsupported")
+                            .fontWeight(.light)
+                            .font(.subheadline)
                     }
                 }
 
@@ -83,6 +107,13 @@ struct BottleCreationView: View {
                 submit()
             }
         }
+        .task {
+            let isSupported = await Wine.supportsPureWin32Prefixes()
+            supportsWin32Architecture = isSupported
+            if !isSupported, newBottleArchitecture == .win32 {
+                newBottleArchitecture = .win64
+            }
+        }
         .fixedSize(horizontal: false, vertical: true)
         .frame(width: ViewWidth.small)
     }
@@ -90,6 +121,7 @@ struct BottleCreationView: View {
     func submit() {
         newlyCreatedBottleURL = BottleVM.shared.createNewBottle(bottleName: newBottleName,
                                                                 winVersion: newBottleVersion,
+                                                                architecture: newBottleArchitecture,
                                                                 bottleURL: newBottleURL)
         dismiss()
     }

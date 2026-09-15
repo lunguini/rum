@@ -37,7 +37,12 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
         return bottles.filter { $0.isAvailable == true }.count
     }
 
-    func createNewBottle(bottleName: String, winVersion: WinVersion, bottleURL: URL) -> URL {
+    func createNewBottle(
+        bottleName: String,
+        winVersion: WinVersion,
+        architecture: BottleArchitecture,
+        bottleURL: URL
+    ) -> URL {
         let newBottleDir = bottleURL.appending(path: UUID().uuidString)
 
         Task.detached {
@@ -52,12 +57,21 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
 
                 await MainActor.run {
                     self.bottles.append(bottle)
+                    if !WhiskyWineInstaller.isDXVKInstalled() {
+                        bottle.settings.graphicsBackend = .wineD3D
+                    }
+                    // Pin new bottles to the engine that created their prefix. Existing bottles
+                    // with a nil ID continue to follow the global default for compatibility.
+                    if let activeEngine = try? WhiskyWineInstaller.wineEngine(for: nil) {
+                        bottle.settings.wineEngineID = activeEngine.id
+                    }
                     bottle.settings.windowsVersion = winVersion
+                    bottle.settings.architecture = architecture
                     bottle.settings.name = bottleName
                 }
 
                 try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
-                let wineVer = try await Wine.wineVersion()
+                let wineVer = try await Wine.wineVersion(bottle: bottle)
 
                 await MainActor.run {
                     bottle.settings.wineVersion = SemanticVersion(wineVer)
@@ -74,6 +88,9 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
                         }
                     }
                 }
+                // Best-effort cleanup of the directory created above so a failed creation
+                // doesn't leave an orphaned prefix on disk.
+                try? FileManager.default.removeItem(at: newBottleDir)
             }
         }
         return newBottleDir

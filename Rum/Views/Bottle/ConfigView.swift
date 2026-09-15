@@ -37,6 +37,7 @@ struct ConfigView: View {
     @State private var dpiConfigLoadingState: LoadingState = .loading
     @State private var dpiSheetPresented: Bool = false
     @AppStorage("wineSectionExpanded") private var wineSectionExpanded: Bool = true
+    @AppStorage("runtimeSectionExpanded") private var runtimeSectionExpanded: Bool = true
     @AppStorage("dxvkSectionExpanded") private var dxvkSectionExpanded: Bool = true
     @AppStorage("metalSectionExpanded") private var metalSectionExpanded: Bool = true
 
@@ -49,6 +50,10 @@ struct ConfigView: View {
                             Text($0.pretty())
                         }
                     }
+                }
+                SettingItemView(title: "config.architecture", loadingState: .success) {
+                    Text(bottle.settings.architecture.pretty())
+                        .foregroundStyle(.secondary)
                 }
                 SettingItemView(title: "config.buildVersion", loadingState: buildVersionLoadingState) {
                     TextField("config.buildVersion", value: $buildVersion, formatter: NumberFormatter())
@@ -117,32 +122,14 @@ struct ConfigView: View {
                     }
                 }
             }
-            Section("config.title.dxvk", isExpanded: $dxvkSectionExpanded) {
-                Toggle(isOn: $bottle.settings.dxvk) {
-                    Text("config.dxvk")
-                }
-                Toggle(isOn: $bottle.settings.dxvkAsync) {
-                    Text("config.dxvk.async")
-                }
-                .disabled(!bottle.settings.dxvk)
-                Picker("config.dxvkHud", selection: $bottle.settings.dxvkHud) {
-                    Text("config.dxvkHud.full").tag(DXVKHUD.full)
-                    Text("config.dxvkHud.partial").tag(DXVKHUD.partial)
-                    Text("config.dxvkHud.fps").tag(DXVKHUD.fps)
-                    Text("config.dxvkHud.off").tag(DXVKHUD.off)
-                }
-                .disabled(!bottle.settings.dxvk)
-                Picker(selection: $bottle.settings.dxvkFrameRate) {
-                    Text("config.dxvkFrameRate.unlimited").tag(0)
-                    ForEach([30, 60, 90, 120, 144, 240], id: \.self) { fps in
-                        Text("\(fps) FPS").tag(fps)
-                    }
-                } label: {
-                    Text("config.dxvkFrameRate")
-                    Text("config.dxvkFrameRate.info")
-                }
-                .disabled(!bottle.settings.dxvk)
-            }
+            RuntimeSettingsView(
+                bottle: bottle,
+                isExpanded: $runtimeSectionExpanded
+            )
+            GraphicsSettingsView(
+                bottle: bottle,
+                isExpanded: $dxvkSectionExpanded
+            )
             Section("config.title.metal", isExpanded: $metalSectionExpanded) {
                 Toggle(isOn: $bottle.settings.metalHud) {
                     Text("config.metalHud")
@@ -164,6 +151,7 @@ struct ConfigView: View {
         }
         .formStyle(.grouped)
         .animation(.whiskyDefault, value: wineSectionExpanded)
+        .animation(.whiskyDefault, value: runtimeSectionExpanded)
         .animation(.whiskyDefault, value: dxvkSectionExpanded)
         .animation(.whiskyDefault, value: metalSectionExpanded)
         .bottomBar {

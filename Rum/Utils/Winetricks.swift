@@ -119,14 +119,27 @@ class Winetricks {
     static func runCommand(command: String, bottle: Bottle) async {
         guard let resourcesURL = Bundle.main.url(forResource: "cabextract", withExtension: nil)?
             .deletingLastPathComponent() else { return }
-        let wineName = Wine.wineBinary.lastPathComponent
-        let binPath = WhiskyWineInstaller.binFolder.path
+        let wineBinary = Wine.wineBinary(for: bottle)
+        let binPath = wineBinary.deletingLastPathComponent().path
         let resPath = resourcesURL.path(percentEncoded: false)
         let prefix = bottle.url.path
         let tricks = winetricksURL.path(percentEncoded: false)
-        let winetricksCmd = #"PATH=\"\#(binPath):\#(resPath):$PATH\""#
-            + #" WINE=\#(wineName) WINEPREFIX=\"\#(prefix)\""#
-            + #" \"\#(tricks)\" \#(command)"#
+        var wineEnvironment: [String: String] = [:]
+        bottle.settings.environmentVariables(wineEnv: &wineEnvironment)
+        wineEnvironment.merge(
+            WhiskyWineInstaller.graphicsEnvironment(
+                for: bottle.settings.graphicsBackend,
+                engineID: bottle.settings.wineEngineID
+            ),
+            uniquingKeysWith: { _, newValue in newValue }
+        )
+        var winetricksCmd = "PATH=\(shellQuote("\(binPath):\(resPath):$PATH"))"
+            + " WINE=\(shellQuote(wineBinary.path))"
+            + " WINEPREFIX=\(shellQuote(prefix))"
+        for (key, value) in wineEnvironment where key != "PATH" {
+            winetricksCmd += " \(key)=\(shellQuote(value))"
+        }
+        winetricksCmd += " \(shellQuote(tricks)) \(command)"
 
         let script = """
         tell application "Terminal"
@@ -155,6 +168,10 @@ class Winetricks {
                 }
             }
         }
+    }
+
+    private static func shellQuote(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\\''") + "'"
     }
 
     static func parseVerbs() async -> [WinetricksCategory] {

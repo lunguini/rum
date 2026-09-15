@@ -21,6 +21,7 @@ import WhiskyKit
 
 struct WhiskyWineInstallView: View {
     @State var installing: Bool = true
+    @State private var installFailed: Bool = false
     @Binding var tarLocation: URL
     @Binding var wineVersion: String
     @Binding var path: [SetupStage]
@@ -36,7 +37,15 @@ struct WhiskyWineInstallView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
-                if installing {
+                if installFailed {
+                    VStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.largeTitle)
+                            .foregroundStyle(.red)
+                        Text("Failed to install Wine.")
+                            .font(.subheadline)
+                    }
+                } else if installing {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .frame(width: 80)
@@ -52,22 +61,27 @@ struct WhiskyWineInstallView: View {
         }
         .frame(width: 400, height: 200)
         .onAppear {
-            Task.detached {
-                await WhiskyWineInstaller.install(from: tarLocation)
-                await WhiskyWineInstaller.saveInstalledVersion(wineVersion)
-                await MainActor.run {
+            let tarball = tarLocation
+            let version = wineVersion
+            Task {
+                do {
+                    try await WhiskyWineInstaller.install(from: tarball, version: version, activate: true)
                     installing = false
+                    try? await Task.sleep(for: .seconds(2))
+                    proceed()
+                } catch {
+                    installing = false
+                    installFailed = true
                 }
-                sleep(2)
-                await proceed()
             }
         }
     }
 
-    @MainActor
     func proceed() {
         if !WhiskyWineInstaller.isDXVKInstalled() {
-            path.append(.dxvkDownload)
+            // DXVK is optional when WineD3D or an imported Metal backend is available. Return to
+            // the dependency overview so the user can continue without it or install it next.
+            path.removeAll()
         } else {
             showSetup = false
         }
