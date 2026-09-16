@@ -70,11 +70,18 @@ extension FileManager {
             throw RendererStateError.missingReplacementFile(replacementURL.path(percentEncoded: false))
         }
 
+        let copyURL = originalURL.appendingPathExtension("orig")
         if sameContents(at: originalURL, and: replacementURL) {
+            // Even when the bytes already match, retain the pre-existing file as the original.
+            // Without this, restoring the renderer would delete a file we did not create.
+            if makeOriginalCopy,
+               fileExists(atPath: originalURL.path(percentEncoded: false)),
+               !fileExists(atPath: copyURL.path(percentEncoded: false)) {
+                try copyItem(at: originalURL, to: copyURL)
+            }
             return
         }
 
-        let copyURL = originalURL.appendingPathExtension("orig")
         let temporaryURL = originalURL.appendingPathExtension("tmp-\(UUID().uuidString)")
         var movedOriginal = false
 

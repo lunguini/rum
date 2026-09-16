@@ -44,7 +44,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         if UserDefaults.standard.bool(forKey: "killOnTerminate") {
-            WhiskyApp.killBottles()
+            // The process exits as soon as this returns, so a plain async `Task` would never run.
+            // Block (bounded) until the bottles are actually killed. This delegate method is always
+            // called on the main thread, so assuming main-actor isolation here is safe.
+            MainActor.assumeIsolated {
+                WhiskyApp.killBottlesAndWaitBlocking()
+            }
         }
     }
 

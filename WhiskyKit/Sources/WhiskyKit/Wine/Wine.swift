@@ -19,24 +19,6 @@
 import Foundation
 import os.log
 
-private actor RendererExecutionCoordinator {
-    static let shared = RendererExecutionCoordinator()
-
-    private var activeBackends: [String: GraphicsBackend] = [:]
-
-    func acquire(bottlePath: String, backend: GraphicsBackend) throws {
-        if let active = activeBackends[bottlePath] {
-            throw GraphicsBackendError.conflictingBackend(bottlePath, active, backend)
-        }
-        activeBackends[bottlePath] = backend
-    }
-
-    func release(bottlePath: String, backend: GraphicsBackend) {
-        guard activeBackends[bottlePath] == backend else { return }
-        activeBackends[bottlePath] = nil
-    }
-}
-
 // swiftlint:disable:next type_body_length
 public class Wine {
     /// URL to the installed `DXVK` folder
@@ -138,15 +120,32 @@ public class Wine {
         onStarted: (@Sendable () -> Void)? = nil
     ) async throws {
         let engine = try WhiskyWineInstaller.wineEngine(for: bottle.settings.wineEngineID)
+        await pinResolvedEngineIfNeeded(for: bottle, engine: engine)
         let backend = bottle.settings.graphicsBackend
         try validateGraphicsBackend(backend, for: bottle, engine: engine)
-        try await RendererExecutionCoordinator.shared.acquire(
+        let launchEnvironment = constructWineEnvironment(for: bottle, environment: environment, engine: engine)
+        try await prepareLaunchResources(
             bottlePath: bottle.url.path(percentEncoded: false),
-            backend: backend
+            backend: backend,
+            engineID: engine.id,
+            initialize: {
+                try RendererStateStore.validateCurrentState(for: bottle, engine: engine)
+                // Wine may refresh a prefix the first time an engine is used. Do that while the
+                // renderer lock is held, before touching renderer DLLs: wineboot can repopulate
+                // system32 and would otherwise undo the renderer preparation below. The marker
+                // keeps this to engine changes instead of every cold launch.
+                if WinePrefixStateStore.needsInitialization(for: bottle, engine: engine) {
+                    try await initializePrefix(for: bottle, engine: engine)
+                    // A failed write only costs a redundant wineboot on the next launch.
+                    try? WinePrefixStateStore.recordInitialization(for: bottle, engine: engine)
+                }
+            },
+            prepare: {
+                try prepareGraphicsBackend(backend, for: bottle, engine: engine)
+            }
         )
-        do {
-            try prepareGraphicsBackend(backend, for: bottle, engine: engine)
 
+        do {
             let logFile = try makeLogFile()
             logFile.fileHandle.writeApplicaitonInfo()
             logFile.fileHandle.writeInfo(for: bottle)
@@ -154,7 +153,7 @@ public class Wine {
                 url: url,
                 args: args,
                 bottle: bottle,
-                environment: environment,
+                environment: launchEnvironment,
                 engine: engine,
                 logFile: logFile,
                 onStarted: onStarted
@@ -169,17 +168,38 @@ public class Wine {
                 throw failure
             }
         } catch {
+            await RendererExecutionCoordinator.shared.release(bottlePath: bottle.url.path, backend: backend)
+            throw error
+        }
+        await RendererExecutionCoordinator.shared.release(bottlePath: bottle.url.path, backend: backend)
+    }
+
+    /// Acquire the bottle renderer lock while Wine refreshes the prefix and renderer files are
+    /// prepared. Kept injectable so ordering and release-on-failure remain testable without Wine.
+    static func prepareLaunchResources(
+        bottlePath: String,
+        backend: GraphicsBackend,
+        engineID: String = "",
+        initialize: () async throws -> Void,
+        prepare: () throws -> Void
+    ) async throws {
+        let needsPreparation = try await RendererExecutionCoordinator.shared.acquire(
+            bottlePath: bottlePath,
+            backend: backend,
+            engineID: engineID
+        )
+        guard needsPreparation else { return }
+        do {
+            try await initialize()
+            try prepare()
+            await RendererExecutionCoordinator.shared.prepared(bottlePath: bottlePath)
+        } catch {
             await RendererExecutionCoordinator.shared.release(
-                bottlePath: bottle.url.path(percentEncoded: false),
+                bottlePath: bottlePath,
                 backend: backend
             )
             throw error
         }
-
-        await RendererExecutionCoordinator.shared.release(
-            bottlePath: bottle.url.path(percentEncoded: false),
-            backend: backend
-        )
     }
 
     static func runProgramArguments(for url: URL, args: [String]) -> [String] {

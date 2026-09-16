@@ -126,6 +126,8 @@ extension WhiskyWineInstaller {
             wineserver: wineserver,
             rendererPaths: rendererDLLPaths(for: backend, capabilities: capabilities)
         )
+        result.merge(rendererLoaderEnvironment(for: backend, capabilities: capabilities),
+                     uniquingKeysWith: { _, newValue in newValue })
 
         if engine?.kind == .sikarugir,
            let frameworks = sikarugirTemplateFrameworksURL(for: libraryFolder) {
@@ -170,10 +172,11 @@ extension WhiskyWineInstaller {
         switch backend {
         case .dxmt:
             guard let root = capabilities?.dxmtRootURL else { return [] }
-            return [root.appending(path: "x86_64-windows"), root.appending(path: "x86_64-unix")]
+            return [root, root.appending(path: "x86_64-windows"), root.appending(path: "x86_64-unix")]
         case .d3dmetal:
             guard let root = capabilities?.d3dmetalRootURL else { return [] }
-            return [root.appending(path: "wine/x86_64-windows"), root.appending(path: "wine/x86_64-unix")]
+            return [root.appending(path: "wine"), root.appending(path: "wine/x86_64-windows"),
+                    root.appending(path: "wine/x86_64-unix")]
         case .wineD3D, .dxvk:
             return []
         }

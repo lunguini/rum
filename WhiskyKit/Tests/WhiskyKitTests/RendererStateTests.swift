@@ -190,4 +190,48 @@ final class RendererStateTests: XCTestCase {
         }
     }
 
+    func testEngineProvenanceSurvivesEngineSelectionChange() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let firstEngine = try makeEngine(at: fixture.root.appending(path: "engine-a"))
+        let secondEngine = try makeEngine(at: fixture.root.appending(path: "engine-b"))
+
+        try RendererStateStore.applyDXMT(
+            bottle: fixture.bottle, sourceRoot: fixture.dxmtRoot, engine: firstEngine
+        )
+        try simulateManagedEngineRefresh(in: fixture, engineRoot: firstEngine.wineURL)
+        try RendererStateStore.applyD3DMetal(
+            bottle: fixture.bottle, sourceRoot: fixture.d3dmetalRoot, engine: secondEngine
+        )
+
+        try assertFile(fixture.system32.appending(path: "d3d11.dll"), equals: "d3dmetal-d3d11")
+    }
+
+    func testFailedReplacementRestoresPreviousRendererAndManifest() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        try RendererStateStore.applyDXMT(bottle: fixture.bottle, sourceRoot: fixture.dxmtRoot)
+        let manifest = try Data(contentsOf: RendererStateStore.stateURL(for: fixture.bottle))
+        let missingSource = fixture.root.appending(path: "missing-renderer")
+
+        XCTAssertThrowsError(
+            try RendererStateStore.applyD3DMetal(bottle: fixture.bottle, sourceRoot: missingSource)
+        )
+        try assertFile(fixture.system32.appending(path: "d3d11.dll"), equals: "dxmt-d3d11")
+        XCTAssertEqual(try Data(contentsOf: RendererStateStore.stateURL(for: fixture.bottle)), manifest)
+    }
+
+    func testWin32System32Uses32BitEngineBuiltin() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let engine = try makeEngine(at: fixture.root.appending(path: "engine"))
+        let urls = RendererStateStore.engineBuiltinURLs(
+            for: "drive_c/windows/system32/d3d11.dll",
+            engine: engine,
+            bottleArchitecture: .win32
+        )
+        XCTAssertTrue(urls.contains { $0.path.contains("i386-windows/d3d11.dll") })
+        XCTAssertFalse(urls.contains { $0.path.contains("x86_64-windows/d3d11.dll") })
+    }
+
 }

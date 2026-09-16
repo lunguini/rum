@@ -104,6 +104,7 @@ struct ConfigView: View {
                         )
                     }
                 }
+                VirtualDesktopSettingsView(bottle: bottle)
                 if #available(macOS 15, *) {
                     Toggle(isOn: $bottle.settings.avxEnabled) {
                         VStack(alignment: .leading) {
@@ -262,6 +263,7 @@ struct ConfigView: View {
             }
         }
     }
+
 }
 
 struct DPIConfigSheetView: View {

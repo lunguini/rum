@@ -24,6 +24,37 @@ struct RendererFileState: Codable, Equatable, Sendable {
     let installedSHA256: String
     let originalSHA256: String?
     let originalExisted: Bool
+    /// Hashes of Wine's builtin copies seen while this renderer was installed.  These are kept
+    /// across engine selection changes so a wineboot refresh from the previous engine is still a
+    /// known, safe replacement.
+    let knownEngineSHA256s: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case relativePath, installedSHA256, originalSHA256, originalExisted, knownEngineSHA256s
+    }
+
+    init(
+        relativePath: String,
+        installedSHA256: String,
+        originalSHA256: String?,
+        originalExisted: Bool,
+        knownEngineSHA256s: [String] = []
+    ) {
+        self.relativePath = relativePath
+        self.installedSHA256 = installedSHA256
+        self.originalSHA256 = originalSHA256
+        self.originalExisted = originalExisted
+        self.knownEngineSHA256s = knownEngineSHA256s
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        relativePath = try container.decode(String.self, forKey: .relativePath)
+        installedSHA256 = try container.decode(String.self, forKey: .installedSHA256)
+        originalSHA256 = try container.decodeIfPresent(String.self, forKey: .originalSHA256)
+        originalExisted = try container.decode(Bool.self, forKey: .originalExisted)
+        knownEngineSHA256s = try container.decodeIfPresent([String].self, forKey: .knownEngineSHA256s) ?? []
+    }
 }
 
 struct BottleRendererState: Codable, Equatable, Sendable {
@@ -83,17 +114,34 @@ enum RendererStateStore {
         restoreLegacyDXVKFiles: Bool,
         engine: WineEngine?
     ) throws {
-        if let state = try load(for: bottle) {
+        let previousState = try load(for: bottle)
+        if let state = previousState {
+            try validateCurrentState(state, for: bottle, engine: engine)
             if state.backend == backend,
                stateMatchesInstalledFiles(state, bottle: bottle, mappings: mappings) {
                 return
             }
-            try restore(state, for: bottle, engine: engine)
-        } else if restoreLegacyDXVKFiles {
-            try restoreLegacyDXVK(bottle: bottle, sourceRoot: Wine.dxvkFolder)
         }
-
+        let transactionDirectory = bottle.url.appending(path: ".rum-renderer-transaction-\(UUID().uuidString)")
+        var transactionBackup: RendererTransactionBackup?
         do {
+            let snapshotMappings = mappings + (restoreLegacyDXVKFiles
+                ? sourceMappings(for: bottle, backend: .dxvk, sourceRoot: Wine.dxvkFolder) : [])
+            let snapshotPaths = try transactionPaths(previousState, bottle: bottle, mappings: snapshotMappings)
+            try FileManager.default.createDirectory(
+                at: transactionDirectory,
+                withIntermediateDirectories: true
+            )
+            transactionBackup = try makeTransactionBackup(
+                for: bottle,
+                paths: snapshotPaths,
+                in: transactionDirectory
+            )
+            if let previousState {
+                try restore(previousState, for: bottle, engine: engine)
+            } else if restoreLegacyDXVKFiles {
+                try restoreLegacyDXVK(bottle: bottle, sourceRoot: Wine.dxvkFolder)
+            }
             for mapping in mappings {
                 try FileManager.default.createDirectory(
                     at: mapping.destination,
@@ -105,17 +153,37 @@ enum RendererStateStore {
                     makeOriginalCopy: true
                 )
             }
-            let state = try makeState(for: bottle, backend: backend, mappings: mappings)
+            let state = try makeState(for: bottle, backend: backend, mappings: mappings, engine: engine)
             try save(state, for: bottle)
+            try? FileManager.default.removeItem(at: transactionDirectory)
         } catch {
-            for mapping in mappings {
-                try? FileManager.default.restoreDLLs(
-                    in: mapping.destination,
-                    from: mapping.source
-                )
+            if let transactionBackup {
+                rollbackTransaction(transactionBackup, for: bottle, mappings: mappings)
             }
+            try? FileManager.default.removeItem(at: transactionDirectory)
             throw error
         }
+    }
+
+    private static func transactionPaths(
+        _ previousState: BottleRendererState?,
+        bottle: Bottle,
+        mappings: [(destination: URL, source: URL)]
+    ) throws -> Set<URL> {
+        var paths = Set<URL>()
+        for file in previousState?.files ?? [] {
+            let destination = try destinationURL(for: file.relativePath, in: bottle)
+            paths.formUnion([destination, destination.appendingPathExtension("orig")])
+        }
+        for mapping in mappings {
+            let enumerator = FileManager.default.enumerator(at: mapping.source, includingPropertiesForKeys: nil)
+            while let source = enumerator?.nextObject() as? URL {
+                guard source.pathExtension == "dll" else { continue }
+                let destination = mapping.destination.appending(path: source.lastPathComponent)
+                paths.formUnion([destination, destination.appendingPathExtension("orig")])
+            }
+        }
+        return paths
     }
 
     static func restoreRenderer(
@@ -186,7 +254,8 @@ extension RendererStateStore {
     private static func makeState(
         for bottle: Bottle,
         backend: GraphicsBackend,
-        mappings: [(destination: URL, source: URL)]
+        mappings: [(destination: URL, source: URL)],
+        engine: WineEngine?
     ) throws -> BottleRendererState {
         var files: [RendererFileState] = []
         for mapping in mappings {
@@ -207,12 +276,23 @@ extension RendererStateStore {
                 if originalExisted && originalSHA256 == nil {
                     throw RendererStateError.invalidManifest(originalURL.path)
                 }
+                var knownEngineSHA256s: [String] = []
+                if let engine {
+                    for engineURL in engineBuiltinURLs(
+                        for: relativePath(of: destinationURL, to: bottle.url),
+                        engine: engine,
+                        bottleArchitecture: bottle.settings.architecture
+                    ) {
+                        if let hash = sha256(of: engineURL) { knownEngineSHA256s.append(hash) }
+                    }
+                }
                 files.append(
                     RendererFileState(
                         relativePath: relativePath(of: destinationURL, to: bottle.url),
                         installedSHA256: installedSHA256,
                         originalSHA256: originalSHA256,
-                        originalExisted: originalExisted
+                        originalExisted: originalExisted,
+                        knownEngineSHA256s: knownEngineSHA256s
                     )
                 )
             }
@@ -257,7 +337,7 @@ extension RendererStateStore {
 }
 
 extension RendererStateStore {
-    private static func load(for bottle: Bottle) throws -> BottleRendererState? {
+    static func load(for bottle: Bottle) throws -> BottleRendererState? {
         let url = stateURL(for: bottle)
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         do {

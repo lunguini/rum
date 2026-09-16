@@ -35,6 +35,8 @@ struct BottleView: View {
     @State private var showWinetricksSheet: Bool = false
 
     private let gridLayout = [GridItem(.adaptive(minimum: 100, maximum: .infinity))]
+    private static let pinnableExtensions: Set<String> = ["exe", "msi", "bat"]
+    @State private var isDropTargeted: Bool = false
 
     private struct LaunchError: Identifiable {
         let id = UUID()
@@ -63,6 +65,15 @@ struct BottleView: View {
                     PinAddView(bottle: bottle)
                 }
                 .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.accentColor, lineWidth: 2)
+                        .padding(4)
+                        .opacity(isDropTargeted ? 1 : 0)
+                )
+                .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+                    handleDrop(providers: providers)
+                }
                 if !sortedHistory.isEmpty {
                     Form {
                         Section("Run History") {
@@ -157,11 +168,11 @@ struct BottleView: View {
                                 do {
                                     if url.pathExtension == "bat" {
                                         try await Wine.runBatchFile(url: url, bottle: bottle)
-                                        await MainActor.run { launchingCount -= 1 }
+                                        await MainActor.run { decrementLaunchingCount() }
                                     } else {
                                         try await Wine.runProgram(at: url, bottle: bottle) {
                                             Task { @MainActor in
-                                                launchingCount -= 1
+                                                decrementLaunchingCount()
                                             }
                                         }
                                     }
@@ -227,6 +238,39 @@ struct BottleView: View {
                 ProgramView(program: program)
             }
         }
+    }
+
+    @MainActor private func decrementLaunchingCount() {
+        launchingCount = max(launchingCount - 1, 0)
+    }
+}
+
+// MARK: - Drag-and-drop pinning
+extension BottleView {
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        var didAccept = false
+        for provider in providers {
+            guard provider.canLoadObject(ofClass: URL.self) else { continue }
+            // Reject non-pinnable files up front using the provider's suggested filename, so the
+            // drop animation doesn't report "accepted" for a file we'll silently ignore. The URL
+            // load below is async, so the real extension isn't available before we must decide.
+            guard let suggestedName = provider.suggestedName,
+                  Self.pinnableExtensions.contains((suggestedName as NSString).pathExtension.lowercased()) else {
+                continue
+            }
+            didAccept = true
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url else { return }
+                guard Self.pinnableExtensions.contains(url.pathExtension.lowercased()) else { return }
+                Task { @MainActor in
+                    guard !bottle.settings.pins.contains(where: { $0.url == url }) else { return }
+                    let name = url.deletingPathExtension().lastPathComponent
+                    bottle.settings.pins.append(PinnedProgram(name: name, url: url))
+                    bottle.updateInstalledPrograms()
+                }
+            }
+        }
+        return didAccept
     }
 
     private func pinEntry(_ entry: RunHistoryEntry) {

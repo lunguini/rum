@@ -31,6 +31,56 @@
         }
       }
     },
+    "config.virtualDesktop" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emulate Virtual Desktop"
+          }
+        }
+      }
+    },
+    "config.virtualDesktop.custom" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom"
+          }
+        }
+      }
+    },
+    "config.virtualDesktop.height" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Height"
+          }
+        }
+      }
+    },
+    "config.virtualDesktop.resolution" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resolution"
+          }
+        }
+      }
+    },
+    "config.virtualDesktop.width" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Width"
+          }
+        }
+      }
+    },
     "alert.info" : {
       "localizations" : {
         "ar" : {
@@ -302,6 +352,9 @@
           }
         }
       }
+    },
+    "button.cancel" : {
+
     },
     "button.cDrive" : {
       "localizations" : {
@@ -9463,6 +9516,12 @@
         }
       }
     },
+    "history.empty" : {
+
+    },
+    "history.remove" : {
+
+    },
     "install.cli" : {
       "localizations" : {
         "ar" : {
@@ -13004,6 +13063,9 @@
         }
       }
     },
+    "program.launching %@" : {
+
+    },
     "program.remove.blocklist" : {
       "localizations" : {
         "ar" : {
@@ -14091,6 +14153,9 @@
           }
         }
       }
+    },
+    "Run History" : {
+
     },
     "run.bottle" : {
       "localizations" : {
@@ -18719,6 +18784,9 @@
         }
       }
     },
+    "tab.history" : {
+
+    },
     "tab.processes" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -18991,6 +19059,27 @@
           }
         }
       }
+    },
+    "update.available.message" : {
+
+    },
+    "update.available.open" : {
+
+    },
+    "update.available.title %@" : {
+
+    },
+    "update.error.message" : {
+
+    },
+    "update.error.title" : {
+
+    },
+    "update.uptodate.message %@" : {
+
+    },
+    "update.uptodate.title" : {
+
     },
     "update.whiskywine.description" : {
       "localizations" : {

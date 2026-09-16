@@ -24,6 +24,7 @@ struct GraphicsSettingsView: View {
     @Binding var isExpanded: Bool
     @State private var availability: [GraphicsBackendAvailability] = []
     @State private var capabilities: WineGraphicsCapabilities?
+    @State private var rendererFallbackMessage: String?
     @State private var showingWineManager = false
 
     var body: some View {
@@ -37,6 +38,13 @@ struct GraphicsSettingsView: View {
             Text(bottle.settings.graphicsBackend.supportedDirectXVersions)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            if bottle.settings.graphicsBackend == .wineD3D,
+               let rendererFallbackMessage {
+                Label(rendererFallbackMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
 
             if let selected = availability.first(where: { $0.backend == bottle.settings.graphicsBackend }),
                !selected.isAvailable,
@@ -90,6 +98,9 @@ struct GraphicsSettingsView: View {
         .onChange(of: bottle.settings.wineEngineID) { _, _ in
             loadAvailability()
         }
+        .onChange(of: bottle.settings.architecture) { _, _ in
+            loadAvailability()
+        }
         .sheet(isPresented: $showingWineManager, onDismiss: loadAvailability) {
             WineManagerView()
         }
@@ -105,12 +116,26 @@ struct GraphicsSettingsView: View {
     }
 
     private func loadAvailability() {
-        capabilities = WhiskyWineInstaller.wineGraphicsCapabilities(
+        let resolvedCapabilities = WhiskyWineInstaller.wineGraphicsCapabilities(
             for: bottle.settings.wineEngineID
         )
+        capabilities = resolvedCapabilities
         availability = WhiskyWineInstaller.graphicsBackendAvailability(
             for: bottle.settings.architecture,
             engineID: bottle.settings.wineEngineID
         )
+        let resolution = GraphicsBackendSelectionResolver.resolve(
+            current: bottle.settings.graphicsBackend,
+            architecture: bottle.settings.architecture,
+            capabilities: resolvedCapabilities,
+            dxvkInstalled: WhiskyWineInstaller.isDXVKInstalled(for: bottle.settings.architecture)
+        )
+        guard resolution.didFallback else {
+            rendererFallbackMessage = nil
+            return
+        }
+        bottle.settings.graphicsBackend = resolution.backend
+        let reason = resolution.reason ?? "The selected engine is incompatible with the previous renderer."
+        rendererFallbackMessage = "Renderer changed to WineD3D: \(reason)"
     }
 }

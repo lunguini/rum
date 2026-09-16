@@ -29,6 +29,7 @@ struct RuntimeSettingsView: View {
     @State private var pendingSelection: String?
     @State private var showingConfirmation = false
     @State private var showingManager = false
+    @State private var rendererFallbackMessage: String?
 
     private static let followGlobalID = "__rum_follow_global__"
 
@@ -92,6 +93,12 @@ struct RuntimeSettingsView: View {
                     .foregroundStyle(.red)
             }
 
+            if bottle.settings.graphicsBackend == .wineD3D, let rendererFallbackMessage {
+                Label(rendererFallbackMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+
             Button {
                 showingManager = true
             } label: {
@@ -111,6 +118,12 @@ struct RuntimeSettingsView: View {
         .onChange(of: bottle.settings.wineEngineID) { _, newValue in
             guard !showingConfirmation else { return }
             pickerSelection = newValue ?? Self.followGlobalID
+        }
+        .onChange(of: bottle.url) { _, _ in
+            showingConfirmation = false
+            pendingSelection = nil
+            rendererFallbackMessage = nil
+            reload()
         }
         .confirmationDialog(
             "Change Wine engine?",
@@ -151,7 +164,9 @@ struct RuntimeSettingsView: View {
 
     private func applyPendingSelection() {
         guard let pendingSelection else { return }
-        bottle.settings.wineEngineID = pendingSelection == Self.followGlobalID ? nil : pendingSelection
+        let engineID = pendingSelection == Self.followGlobalID ? nil : pendingSelection
+        bottle.settings.wineEngineID = engineID
+        reconcileRenderer(for: engineID)
         self.pendingSelection = nil
         pickerSelection = bottle.settings.wineEngineID ?? Self.followGlobalID
     }
@@ -164,5 +179,25 @@ struct RuntimeSettingsView: View {
     private func reload() {
         engines = WhiskyWineInstaller.installedWineEngines()
         globalEngine = try? WhiskyWineInstaller.wineEngine(for: nil)
+        guard !showingConfirmation else { return }
+        pickerSelection = bottle.settings.wineEngineID ?? Self.followGlobalID
+        reconcileRenderer(for: bottle.settings.wineEngineID)
+    }
+
+    private func reconcileRenderer(for engineID: String?) {
+        let capabilities = WhiskyWineInstaller.wineGraphicsCapabilities(for: engineID)
+        let resolution = GraphicsBackendSelectionResolver.resolve(
+            current: bottle.settings.graphicsBackend,
+            architecture: bottle.settings.architecture,
+            capabilities: capabilities,
+            dxvkInstalled: WhiskyWineInstaller.isDXVKInstalled(for: bottle.settings.architecture)
+        )
+        guard resolution.didFallback else {
+            rendererFallbackMessage = nil
+            return
+        }
+        bottle.settings.graphicsBackend = resolution.backend
+        let reason = resolution.reason ?? "The selected engine is incompatible with the previous renderer."
+        rendererFallbackMessage = "Renderer changed to WineD3D: \(reason)"
     }
 }

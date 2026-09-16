@@ -22,6 +22,7 @@ import WhiskyKit
 
 struct ContentView: View {
     @AppStorage("selectedBottleURL") private var selectedBottleURL: URL?
+    @AppStorage("checkWhiskyWineUpdates") private var checkWhiskyWineUpdates = true
     @EnvironmentObject var bottleVM: BottleVM
     @Binding var showSetup: Bool
 
@@ -101,12 +102,12 @@ struct ContentView: View {
                 }
             }
 
-            if !WhiskyWineInstaller.isWhiskyWineInstalled()
-                || !WhiskyWineInstaller.isDXVKInstalled() {
+            if !WhiskyWineInstaller.isWhiskyWineInstalled() {
                 showSetup = true
             }
-            let updateStatus = await WhiskyWineInstaller.shouldUpdateWhiskyWine()
-            if updateStatus.shouldUpdate {
+            if checkWhiskyWineUpdates {
+                let updateStatus = await WhiskyWineInstaller.shouldUpdateWhiskyWine()
+                guard updateStatus.shouldUpdate else { return }
                 let localVersion = WhiskyWineInstaller.installedWineVersion() ?? "unknown"
                 let alert = NSAlert()
                 alert.messageText = String(localized: "update.whiskywine.title")
@@ -120,7 +121,6 @@ struct ContentView: View {
                 let response = alert.runModal()
 
                 if response == .alertFirstButtonReturn {
-                    WhiskyWineInstaller.uninstall()
                     showSetup = true
                 }
             }
