@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.0
+
+### New Features
+
+- Selectable Wine engines — pick a runtime per bottle or set a global default, with Gcenx and Sikarugir builds managed side by side
+- Metal renderers — DXMT joins DXVK and WineD3D as a per-bottle graphics backend
+- Virtual desktop settings — run a bottle inside a Wine virtual desktop at a chosen resolution
+- DXVK frame rate limiter selectable from a preset picker (Unlimited/30/60/90/120/144/240)
+
+### Improvements
+
+- Renderer files are restored automatically after a managed or external Wine refresh repopulates a prefix
+- DXVK-only controls are hidden when another renderer is selected
+- Clearer renderer errors when a backend is unavailable or a bottle is already running under a different one
+- Local runs use the current Rum build rather than an installed copy
+
+### Fixes
+
+- Wine no longer shows "updating your configuration" on every launch — `wineboot` now runs only when a bottle's engine actually changes
+- Bottles created before engine identity was persisted now pin the engine they resolve to, so changing the global default no longer switches their runtime silently
+- Fixed the Winetricks view opening an empty list — the winetricks script and verbs are downloaded on demand, with a retry state when the list can't be loaded
+
 ## 1.1.0
 
 ### New Features
