@@ -42,9 +42,15 @@ Run `make test` for the deterministic WhiskyKit suite. On a Mac with CrossOver i
 ### Homebrew
 
 ```bash
+brew trust --tap lunguini/tap
 brew tap lunguini/tap
 brew install --cask rum
 ```
+
+> **Note:** Homebrew 6.0 and later refuse to load anything from a third-party tap until it is
+> trusted, so `brew trust` must come first — on Homebrew 7 the tap step fails without it. Older
+> Homebrew versions have no `brew trust` command; skip that line if yours reports
+> `Unknown command: trust`.
 
 ### Manual
 
