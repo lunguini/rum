@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Offer missing DXVK at startup until explicitly skipped, and report DXVK installation failures
+- Refresh the setup checklist after installing Wine so setup can continue to optional DXVK
+- Preserve Wine and DXVK setup downloads before URLSession removes temporary files
+- Reject failed HTTP downloads and show download and Wine installation errors during setup
+
 ## 1.2.0
 
 ### New Features

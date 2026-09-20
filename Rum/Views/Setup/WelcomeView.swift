@@ -20,6 +20,7 @@ import SwiftUI
 import WhiskyKit
 
 struct WelcomeView: View {
+    @AppStorage("skipDXVKSetup") private var skipDXVKSetup = false
     @State var rosettaInstalled: Bool?
     @State var whiskyWineInstalled: Bool?
     @State var dxvkInstalled: Bool?
@@ -82,12 +83,6 @@ struct WelcomeView: View {
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .onAppear {
-                checkInstallStatus()
-            }
-            .onChange(of: shouldCheckInstallStatus) {
-                checkInstallStatus()
-            }
             Spacer()
             HStack {
                 if rosettaInstalled != nil,
@@ -101,11 +96,12 @@ struct WelcomeView: View {
                     }
                     Spacer()
                     if requiredDependenciesInstalled && dxvkInstalled == false {
-                        Button("setup.next") {
-                            path.append(.dxvkDownload)
-                        }
-                        Button("setup.done") {
+                        Button("Skip DXVK") {
+                            skipDXVKSetup = true
                             showSetup = false
+                        }
+                        Button("Install DXVK") {
+                            path.append(.dxvkDownload)
                         }
                         .keyboardShortcut(.defaultAction)
                     } else {
@@ -118,6 +114,19 @@ struct WelcomeView: View {
             }
         }
         .frame(width: 400, height: 250)
+        .onAppear {
+            checkInstallStatus()
+        }
+        .onChange(of: path.isEmpty) {
+            // NavigationStack can retain the checklist while an installer is pushed.
+            // Refresh explicitly when returning, even if Form does not appear again.
+            if path.isEmpty {
+                checkInstallStatus()
+            }
+        }
+        .onChange(of: shouldCheckInstallStatus) {
+            checkInstallStatus()
+        }
         .sheet(isPresented: $showWineManager) {
             WineManagerView()
                 .onDisappear {
@@ -133,6 +142,7 @@ struct WelcomeView: View {
     }
 
     private func advanceSetup() {
+        checkInstallStatus()
         if rosettaInstalled == false {
             path.append(.rosetta)
             return
@@ -158,7 +168,17 @@ struct InstallStatusView: View {
     @State var showUninstall: Bool = false
     var manageAction: (() -> Void)?
     @State var name: String
-    @State var text: String = String(localized: "setup.install.checking")
+
+    private var text: String {
+        switch isInstalled {
+        case true:
+            String(localized: "setup.install.installed")
+        case false:
+            String(localized: "setup.install.notInstalled")
+        case nil:
+            String(localized: "setup.install.checking")
+        }
+    }
 
     var body: some View {
         HStack {
@@ -185,17 +205,6 @@ struct InstallStatusView: View {
                         uninstall()
                     }
                 }
-            }
-        }
-        .onChange(of: isInstalled) {
-            if let installed = isInstalled {
-                if installed {
-                    text = String(localized: "setup.install.installed")
-                } else {
-                    text = String(localized: "setup.install.notInstalled")
-                }
-            } else {
-                text = String(localized: "setup.install.checking")
             }
         }
     }

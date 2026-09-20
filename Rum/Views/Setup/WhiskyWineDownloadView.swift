@@ -28,6 +28,7 @@ struct WhiskyWineDownloadView: View {
     @State private var observation: NSKeyValueObservation?
     @State private var startTime: Date?
     @State private var fetchFailed: Bool = false
+    @State private var failureMessage = ""
     @Binding var tarLocation: URL
     @Binding var wineVersion: String
     @Binding var path: [SetupStage]
@@ -46,7 +47,7 @@ struct WhiskyWineDownloadView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
                             .foregroundStyle(.red)
-                        Text("Failed to fetch Wine release info.")
+                        Text(failureMessage.isEmpty ? "Failed to fetch Wine release info." : failureMessage)
                             .font(.subheadline)
                     }
                 } else {
@@ -85,13 +86,20 @@ struct WhiskyWineDownloadView: View {
                 wineVersion = release.version
                 let url = release.downloadURL
 
-                downloadTask = URLSession(configuration: .ephemeral).downloadTask(with: url) { url, _, _ in
-                    Task.detached {
-                        await MainActor.run {
-                            if let url = url {
-                                tarLocation = url
-                                proceed()
-                            }
+                downloadTask = URLSession(configuration: .ephemeral)
+                    .downloadTask(with: url) { location, response, error in
+                    // URLSession deletes its file after this callback returns.
+                    let result = Result {
+                        try SetupDownload.preserve(location: location, response: response, error: error)
+                    }
+                    Task { @MainActor in
+                        switch result {
+                        case .success(let savedURL):
+                            tarLocation = savedURL
+                            proceed()
+                        case .failure(let error):
+                            failureMessage = error.localizedDescription
+                            fetchFailed = true
                         }
                     }
                 }

@@ -28,6 +28,7 @@ struct DXVKDownloadView: View {
     @State private var observation: NSKeyValueObservation?
     @State private var startTime: Date?
     @State private var fetchFailed: Bool = false
+    @State private var failureMessage = ""
     @Binding var tarLocation: URL
     @Binding var path: [SetupStage]
 
@@ -46,7 +47,7 @@ struct DXVKDownloadView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
                             .foregroundStyle(.red)
-                        Text("Failed to fetch DXVK release info.")
+                        Text(failureMessage.isEmpty ? "Failed to fetch DXVK release info." : failureMessage)
                             .font(.subheadline)
                     }
                 } else {
@@ -78,13 +79,19 @@ struct DXVKDownloadView: View {
                 }
 
                 downloadTask = URLSession(configuration: .ephemeral)
-                    .downloadTask(with: url) { url, _, _ in
-                    Task.detached {
-                        await MainActor.run {
-                            if let url = url {
-                                tarLocation = url
-                                path.append(.dxvkInstall)
-                            }
+                    .downloadTask(with: url) { location, response, error in
+                    // URLSession deletes its file after this callback returns.
+                    let result = Result {
+                        try SetupDownload.preserve(location: location, response: response, error: error)
+                    }
+                    Task { @MainActor in
+                        switch result {
+                        case .success(let savedURL):
+                            tarLocation = savedURL
+                            path.append(.dxvkInstall)
+                        case .failure(let error):
+                            failureMessage = error.localizedDescription
+                            fetchFailed = true
                         }
                     }
                 }

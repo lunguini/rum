@@ -22,6 +22,7 @@ import WhiskyKit
 struct WhiskyWineInstallView: View {
     @State var installing: Bool = true
     @State private var installFailed: Bool = false
+    @State private var failureMessage = ""
     @Binding var tarLocation: URL
     @Binding var wineVersion: String
     @Binding var path: [SetupStage]
@@ -42,7 +43,7 @@ struct WhiskyWineInstallView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
                             .foregroundStyle(.red)
-                        Text("Failed to install Wine.")
+                        Text("Failed to install Wine: \(failureMessage)")
                             .font(.subheadline)
                     }
                 } else if installing {
@@ -64,6 +65,7 @@ struct WhiskyWineInstallView: View {
             let tarball = tarLocation
             let version = wineVersion
             Task {
+                defer { try? FileManager.default.removeItem(at: tarball) }
                 do {
                     try await WhiskyWineInstaller.install(from: tarball, version: version, activate: true)
                     installing = false
@@ -71,6 +73,7 @@ struct WhiskyWineInstallView: View {
                     proceed()
                 } catch {
                     installing = false
+                    failureMessage = (error as? String) ?? error.localizedDescription
                     installFailed = true
                 }
             }

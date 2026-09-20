@@ -20,6 +20,8 @@ import SwiftUI
 import WhiskyKit
 
 struct DXVKInstallView: View {
+    @AppStorage("skipDXVKSetup") private var skipDXVKSetup = false
+    @State private var failureMessage: String?
     @State var installing: Bool = true
     @Binding var tarLocation: URL
     @Binding var path: [SetupStage]
@@ -35,7 +37,13 @@ struct DXVKInstallView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
-                if installing {
+                if let failureMessage {
+                    Text("Failed to install DXVK: \(failureMessage)")
+                        .foregroundStyle(.red)
+                    Button("Back to Setup") {
+                        path.removeAll()
+                    }
+                } else if installing {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .frame(width: 80)
@@ -52,13 +60,17 @@ struct DXVKInstallView: View {
         .frame(width: 400, height: 200)
         .onAppear {
             let location = tarLocation
-            Task.detached {
-                WhiskyWineInstaller.installDXVK(from: location)
-                await MainActor.run {
+            Task {
+                do {
+                    try await WhiskyWineInstaller.installDXVK(from: location)
                     installing = false
+                    skipDXVKSetup = false
+                    try? await Task.sleep(for: .seconds(2))
+                    proceed()
+                } catch {
+                    installing = false
+                    failureMessage = (error as? String) ?? error.localizedDescription
                 }
-                sleep(2)
-                await proceed()
             }
         }
     }
