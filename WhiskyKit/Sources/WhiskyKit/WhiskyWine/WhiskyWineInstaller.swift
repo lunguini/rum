@@ -224,44 +224,42 @@ public class WhiskyWineInstaller {
         return nil
     }
 
-    /// Install DXVK from a downloaded tar.gz
-    public static func installDXVK(from tarball: URL) {
-        do {
-            let tempDir = FileManager.default.temporaryDirectory
-                .appending(path: UUID().uuidString)
-            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-
-            try Tar.untar(tarBall: tarball, toURL: tempDir)
-
-            // Find the extracted directory (e.g. dxvk-macOS-async-v1.10.3-...)
-            let contents = try FileManager.default.contentsOfDirectory(
-                at: tempDir, includingPropertiesForKeys: nil
-            )
-            guard let extractedDir = contents.first(where: {
-                $0.hasDirectoryPath
-            }) else {
-                throw "No directory found in extracted DXVK archive"
-            }
-
-            // Clean existing DXVK
-            if FileManager.default.fileExists(atPath: dxvkFolder.path) {
-                try FileManager.default.removeItem(at: dxvkFolder)
-            }
-            if !FileManager.default.fileExists(atPath: libraryFolder.path) {
-                try FileManager.default.createDirectory(
-                    at: libraryFolder, withIntermediateDirectories: true
-                )
-            }
-
-            // Move extracted -> Libraries/DXVK
-            try FileManager.default.moveItem(at: extractedDir, to: dxvkFolder)
-
-            // Clean up
-            try FileManager.default.removeItem(at: tempDir)
-            try FileManager.default.removeItem(at: tarball)
-        } catch {
-            print("Failed to install DXVK: \(error)")
+    /// Install DXVK from a downloaded tar.gz, reporting extraction and validation failures.
+    public static func installDXVK(
+        from tarball: URL,
+        in libraryFolder: URL = libraryFolder
+    ) async throws {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory.appending(path: UUID().uuidString)
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer {
+            try? fileManager.removeItem(at: tempDir)
+            try? fileManager.removeItem(at: tarball)
         }
+        try Tar.untar(tarBall: tarball, toURL: tempDir)
+
+        let contents = try fileManager.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil)
+        guard let extractedDir = contents.first(where: { directory in
+            ["d3d10core.dll", "d3d11.dll"].allSatisfy {
+                fileManager.fileExists(atPath: directory.appending(path: "x64/\($0)").path)
+            }
+        }) else {
+            throw WineManagerError.invalidGraphicsRuntimeArchive("DXVK")
+        }
+
+        try fileManager.createDirectory(at: libraryFolder, withIntermediateDirectories: true)
+        let destination = libraryFolder.appending(path: "DXVK")
+        let backup = libraryFolder.appending(path: ".dxvk-backup-\(UUID().uuidString)")
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.moveItem(at: destination, to: backup)
+        }
+        do {
+            try fileManager.moveItem(at: extractedDir, to: destination)
+        } catch {
+            try? fileManager.moveItem(at: backup, to: destination)
+            throw error
+        }
+        try? fileManager.removeItem(at: backup)
     }
 
     /// Check if a Wine update is available.

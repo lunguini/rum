@@ -23,6 +23,7 @@ import WhiskyKit
 struct ContentView: View {
     @AppStorage("selectedBottleURL") private var selectedBottleURL: URL?
     @AppStorage("checkWhiskyWineUpdates") private var checkWhiskyWineUpdates = true
+    @AppStorage("skipDXVKSetup") private var skipDXVKSetup = false
     @EnvironmentObject var bottleVM: BottleVM
     @Binding var showSetup: Bool
 
@@ -102,7 +103,8 @@ struct ContentView: View {
                 }
             }
 
-            if !WhiskyWineInstaller.isWhiskyWineInstalled() {
+            if !Rosetta2.isRosettaInstalled || !WhiskyWineInstaller.isWhiskyWineInstalled()
+                || (!skipDXVKSetup && !WhiskyWineInstaller.isDXVKInstalled()) {
                 showSetup = true
             }
             if checkWhiskyWineUpdates {
