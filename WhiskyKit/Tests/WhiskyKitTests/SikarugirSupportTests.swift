@@ -139,6 +139,102 @@ final class SikarugirSupportTests: XCTestCase {
         XCTAssertTrue(environment["DYLD_FALLBACK_LIBRARY_PATH"]?.contains("Frameworks") == true)
     }
 
+    func testSupportLibrariesAreLinkedIntoEngineLibFolder() throws {
+        let frameworks = temporaryLibrary.appending(path: "SikarugirSupport/Template-1.0.5/Frameworks")
+        try makeFile(frameworks.appending(path: "libinotify.0.dylib"))
+        try makeFile(frameworks.appending(path: "libintl.8.dylib"))
+        // GStreamer keeps its libraries in a versioned framework rather than at the top level.
+        let gstreamerLib = frameworks.appending(path: "GStreamer.framework/Versions/1.0/lib")
+        try makeFile(gstreamerLib.appending(path: "libgstreamer-1.0.0.dylib"))
+
+        let engineRoot = temporaryLibrary.appending(path: "WineBuilds/sikarugir/Wine")
+        try makeFile(engineRoot.appending(path: "bin/wine"))
+
+        let linked = WhiskyWineInstaller.linkSikarugirSupportLibraries(
+            forEngineRoot: engineRoot,
+            frameworks: frameworks
+        )
+
+        XCTAssertTrue(linked.contains("libinotify.0.dylib"))
+        XCTAssertTrue(linked.contains("libintl.8.dylib"))
+        XCTAssertTrue(linked.contains("libgstreamer-1.0.0.dylib"))
+
+        // @rpath on the Sikarugir binaries is @loader_path/../lib, so the links must land here.
+        let libFolder = engineRoot.appending(path: "lib")
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(
+                atPath: libFolder.appending(path: "libinotify.0.dylib").path
+            ),
+            frameworks.appending(path: "libinotify.0.dylib").path
+        )
+        // Directory enumeration resolves /var to /private/var, so compare resolved paths.
+        XCTAssertEqual(
+            URL(filePath: try FileManager.default.destinationOfSymbolicLink(
+                atPath: libFolder.appending(path: "libgstreamer-1.0.0.dylib").path
+            )).resolvingSymlinksInPath(),
+            gstreamerLib.appending(path: "libgstreamer-1.0.0.dylib").resolvingSymlinksInPath()
+        )
+
+        // Libraries the template does not ship are simply skipped.
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: libFolder.appending(path: "libavcodec.61.dylib").path)
+        )
+    }
+
+    func testLinkingIsIdempotentAndRepointsStaleLinks() throws {
+        let engineRoot = temporaryLibrary.appending(path: "WineBuilds/sikarugir/Wine")
+        let oldFrameworks = temporaryLibrary.appending(path: "SikarugirSupport/Template-1.0.5/Frameworks")
+        try makeFile(oldFrameworks.appending(path: "libinotify.0.dylib"))
+
+        WhiskyWineInstaller.linkSikarugirSupportLibraries(
+            forEngineRoot: engineRoot,
+            frameworks: oldFrameworks
+        )
+        // Repeating the call must not fail on the existing link.
+        WhiskyWineInstaller.linkSikarugirSupportLibraries(
+            forEngineRoot: engineRoot,
+            frameworks: oldFrameworks
+        )
+
+        let destination = engineRoot.appending(path: "lib/libinotify.0.dylib")
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(atPath: destination.path),
+            oldFrameworks.appending(path: "libinotify.0.dylib").path
+        )
+
+        // Installing a newer template must repoint the link instead of leaving it dangling.
+        let newFrameworks = temporaryLibrary.appending(path: "SikarugirSupport/Template-1.0.11/Frameworks")
+        try makeFile(newFrameworks.appending(path: "libinotify.0.dylib"))
+        try FileManager.default.removeItem(at: oldFrameworks.deletingLastPathComponent())
+
+        WhiskyWineInstaller.linkSikarugirSupportLibraries(
+            forEngineRoot: engineRoot,
+            frameworks: newFrameworks
+        )
+
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(atPath: destination.path),
+            newFrameworks.appending(path: "libinotify.0.dylib").path
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    func testEngineOwnedLibraryIsNotReplacedByLink() throws {
+        let frameworks = temporaryLibrary.appending(path: "SikarugirSupport/Template-1.0.5/Frameworks")
+        try makeFile(frameworks.appending(path: "libinotify.0.dylib"))
+
+        let engineRoot = temporaryLibrary.appending(path: "WineBuilds/sikarugir/Wine")
+        let shipped = engineRoot.appending(path: "lib/libinotify.0.dylib")
+        try makeFile(shipped)
+
+        WhiskyWineInstaller.linkSikarugirSupportLibraries(
+            forEngineRoot: engineRoot,
+            frameworks: frameworks
+        )
+
+        XCTAssertNil(try? FileManager.default.destinationOfSymbolicLink(atPath: shipped.path))
+    }
+
     private func makeDXMTPayload(at root: URL) throws {
         try makeFile(root.appending(path: "x86_64-unix/winemetal.so"))
         try makeFile(root.appending(path: "x86_64-windows/winemetal.dll"))

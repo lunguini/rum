@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.1
+
+### Fixes
+
+- Winetricks verbs no longer fail with "command not found" for `grep`, `dirname`, `mkdir` and friends — `$PATH` was quoted so it was passed literally instead of being expanded, leaving winetricks without `/usr/bin` and `/bin`
+- Winetricks now works with Sikarugir engines — the engine's support libraries are linked into its own `lib` folder, so `wineserver` no longer fails with `Library not loaded: @rpath/libinotify.0.dylib`. macOS SIP strips `DYLD_*` from `/bin/sh`, which winetricks runs under, so the engine can no longer rely on those variables surviving
+
 ## 1.2.0
 
 ### New Features

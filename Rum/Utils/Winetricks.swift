@@ -91,6 +91,8 @@ class Winetricks {
     private static func generateVerbs() async {
         guard let resourcesURL = Bundle.main.url(forResource: "cabextract", withExtension: nil)?
             .deletingLastPathComponent() else { return }
+        WhiskyWineInstaller.linkSikarugirSupportLibraries()
+
         let binPath = WhiskyWineInstaller.binFolder.path
         let resPath = resourcesURL.path(percentEncoded: false)
         let wineName = Wine.wineBinary.lastPathComponent
@@ -119,6 +121,11 @@ class Winetricks {
     static func runCommand(command: String, bottle: Bottle) async {
         guard let resourcesURL = Bundle.main.url(forResource: "cabextract", withExtension: nil)?
             .deletingLastPathComponent() else { return }
+        // Winetricks runs under /bin/sh, which SIP strips DYLD_* from, so the engine has to be able
+        // to find its @rpath libraries on its own. Cheap and idempotent; also repairs engines that
+        // were installed before this linking existed.
+        WhiskyWineInstaller.linkSikarugirSupportLibraries()
+
         let wineBinary = Wine.wineBinary(for: bottle)
         let binPath = wineBinary.deletingLastPathComponent().path
         let resPath = resourcesURL.path(percentEncoded: false)
@@ -133,7 +140,9 @@ class Winetricks {
             ),
             uniquingKeysWith: { _, newValue in newValue }
         )
-        var winetricksCmd = "PATH=\(shellQuote("\(binPath):\(resPath):$PATH"))"
+        // $PATH must stay outside the quotes so the shell expands it; otherwise winetricks
+        // loses /usr/bin and /bin and every helper it shells out to is "command not found".
+        var winetricksCmd = "PATH=\(shellQuote("\(binPath):\(resPath)")):$PATH"
             + " WINE=\(shellQuote(wineBinary.path))"
             + " WINEPREFIX=\(shellQuote(prefix))"
         for (key, value) in wineEnvironment where key != "PATH" {

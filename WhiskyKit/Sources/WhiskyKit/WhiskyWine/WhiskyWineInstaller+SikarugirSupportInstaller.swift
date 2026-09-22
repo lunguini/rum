@@ -103,6 +103,10 @@ extension WhiskyWineInstaller {
             activate: activate,
             in: libraryFolder
         )
+
+        // Make the engine resolve its @rpath libraries without relying on DYLD_* surviving into
+        // the process, which SIP prevents whenever Wine is reached through a system shell.
+        linkSikarugirSupportLibraries(in: libraryFolder)
     }
 
     public static func installSikarugirSupport(
@@ -162,6 +166,9 @@ extension WhiskyWineInstaller {
         }
 
         try? FileManager.default.removeItem(at: tarball)
+
+        // A new template moves the support libraries, so re-point every engine's symlinks at it.
+        linkSikarugirSupportLibraries(in: libraryFolder)
     }
 
     private static func sanitizedSupportVersion(_ version: String) -> String {
