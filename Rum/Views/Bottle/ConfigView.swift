@@ -188,7 +188,6 @@ struct ConfigView: View {
             }
             .padding()
         }
-        .navigationTitle("tab.config")
         .onAppear {
             winVersionLoadingState = .success
 

@@ -48,11 +48,49 @@ public struct RunHistoryEntry: Codable, Hashable, Equatable {
     public var name: String
     public var url: URL
     public var lastRun: Date
+    /// How many times the program was started from Rum. Entries from before this was tracked
+    /// count as one.
+    public var runCount: Int
+    /// Total time at least one instance was running, in seconds.
+    public var playTime: TimeInterval
+    /// When the program was started, for the last `runDatesKept` (older ones are dropped).
+    /// Entries from before this was tracked start with their last run.
+    public var runDates: [Date]
+
+    /// How far back `runDates` goes.
+    public static let runDatesKept: TimeInterval = 90 * 24 * 60 * 60
 
     public init(name: String, url: URL) {
         self.name = name
         self.url = url
         self.lastRun = Date()
+        self.runCount = 1
+        self.playTime = 0
+        self.runDates = [lastRun]
+    }
+
+    /// Records a run at `date`, forgetting runs older than `runDatesKept`.
+    public mutating func recordRun(at date: Date = Date()) {
+        lastRun = date
+        runCount += 1
+        runDates.append(date)
+        let cutoff = date.addingTimeInterval(-Self.runDatesKept)
+        runDates.removeAll { $0 < cutoff }
+    }
+
+    /// Number of runs since `date`. Only reliable within `runDatesKept`.
+    public func runCount(since date: Date) -> Int {
+        runDates.count { $0 >= date }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.url = try container.decode(URL.self, forKey: .url)
+        self.lastRun = try container.decode(Date.self, forKey: .lastRun)
+        self.runCount = try container.decodeIfPresent(Int.self, forKey: .runCount) ?? 1
+        self.playTime = try container.decodeIfPresent(TimeInterval.self, forKey: .playTime) ?? 0
+        self.runDates = try container.decodeIfPresent([Date].self, forKey: .runDates) ?? [lastRun]
     }
 }
 

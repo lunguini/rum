@@ -23,8 +23,9 @@ import Foundation
 /// Only applicable to ``ResourceDirectoryEntry`` with an ID
 public enum ResourceType: UInt32, CaseIterable, Hashable, Equatable {
     case unknown
-    // We only care about icon
     case icon = 3
+    /// `VS_VERSIONINFO`: product name, description, version.
+    case version = 16
 
     public init?(rawValue: UInt32?) {
         if let rawValue, let value = ResourceType(rawValue: rawValue) {

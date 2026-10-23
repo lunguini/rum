@@ -80,6 +80,11 @@ public final class Program: ObservableObject, Equatable, Hashable, Identifiable,
         }
     }
 
+    /// The renderer this program launches with: its own choice, or the bottle's.
+    public var graphicsBackend: GraphicsBackend {
+        settings.graphicsBackend ?? bottle.settings.graphicsBackend
+    }
+
     public func generateEnvironment() -> [String: String] {
         var environment = settings.environment
         if settings.locale != .auto {

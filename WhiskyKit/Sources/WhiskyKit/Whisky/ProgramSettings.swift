@@ -70,6 +70,9 @@ public struct ProgramSettings: Codable {
     public var locale: Locales = .auto
     public var environment: [String: String] = [:]
     public var arguments: String = ""
+    /// Renderer for this program alone; `nil` uses the bottle's. Applied at launch, so it can be
+    /// changed freely while the bottle is idle.
+    public var graphicsBackend: GraphicsBackend?
 
     static func decode(from settingsURL: URL) throws -> ProgramSettings {
         guard FileManager.default.fileExists(atPath: settingsURL.path(percentEncoded: false)) else {

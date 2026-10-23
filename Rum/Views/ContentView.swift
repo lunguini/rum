@@ -20,71 +20,29 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WhiskyKit
 
+/// The main window: the Library. Bottles are managed from Settings / the Bottles window.
 struct ContentView: View {
-    @AppStorage("selectedBottleURL") private var selectedBottleURL: URL?
     @AppStorage("checkWhiskyWineUpdates") private var checkWhiskyWineUpdates = true
+    @AppStorage(BottleVM.defaultBottleKey) private var defaultBottleURL: URL?
     @EnvironmentObject var bottleVM: BottleVM
     @Binding var showSetup: Bool
 
-    @State private var selected: URL?
-    @State private var showBottleCreation: Bool = false
     @State private var bottlesLoaded: Bool = false
-    @State private var showBottleSelection: Bool = false
-    @State private var newlyCreatedBottleURL: URL?
     @State private var openedFileURL: URL?
-    @State private var triggerRefresh: Bool = false
-    @State private var refreshAnimation: Angle = .degrees(0)
-
-    @State private var bottleFilter = ""
 
     var body: some View {
-        NavigationSplitView {
-            sidebar
-        } detail: {
-            detail
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showBottleCreation.toggle()
-                } label: {
-                    Image(systemName: "plus")
-                        .help("button.createBottle")
-                }
+        Group {
+            if bottlesLoaded {
+                LibraryView()
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    bottleVM.loadBottles()
-                    if let bottle = bottleVM.bottles.first(where: { $0.url == selected }) {
-                        bottle.updateInstalledPrograms()
-                    }
-                    triggerRefresh.toggle()
-                    withAnimation(.default) {
-                        refreshAnimation = .degrees(360)
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        refreshAnimation = .degrees(0)
-                    }
-                } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .help("button.refresh")
-                        .rotationEffect(refreshAnimation)
-                }
-            }
-        }
-        .sheet(isPresented: $showBottleCreation) {
-            BottleCreationView(newlyCreatedBottleURL: $newlyCreatedBottleURL)
         }
         .sheet(isPresented: $showSetup) {
             SetupView(showSetup: $showSetup, firstTime: false)
         }
         .sheet(item: $openedFileURL) { url in
             FileOpenView(fileURL: url,
-                         currentBottle: selected,
+                         currentBottle: bottleVM.defaultBottle(preferredURL: defaultBottleURL)?.url,
                          bottles: bottleVM.bottles)
-        }
-        .onChange(of: selected) {
-            selectedBottleURL = selected
         }
         .handlesExternalEvents(preferring: [], allowing: ["*"])
         .onOpenURL { url in
@@ -93,14 +51,6 @@ struct ContentView: View {
         .task {
             bottleVM.loadBottles()
             bottlesLoaded = true
-
-            if !bottleVM.bottles.isEmpty || bottleVM.countActive() != 0 {
-                if let bottle = bottleVM.bottles.first(where: { $0.url == selectedBottleURL && $0.isAvailable }) {
-                    selected = bottle.url
-                } else {
-                    selected = bottleVM.bottles[0].url
-                }
-            }
 
             if !WhiskyWineInstaller.isWhiskyWineInstalled() {
                 showSetup = true
@@ -124,82 +74,6 @@ struct ContentView: View {
                     showSetup = true
                 }
             }
-        }
-    }
-
-    var sidebar: some View {
-        ScrollViewReader { proxy in
-            List(selection: $selected) {
-                Section {
-                    ForEach(filteredBottles) { bottle in
-                        Group {
-                            if bottle.inFlight {
-                                HStack {
-                                    Text(bottle.settings.name)
-                                    Spacer()
-                                    ProgressView().controlSize(.small)
-                                }
-                                .opacity(0.5)
-                            } else {
-                                BottleListEntry(bottle: bottle, selected: $selected, refresh: $triggerRefresh)
-                                    .selectionDisabled(!bottle.isAvailable)
-                            }
-                        }
-                        .id(bottle.url)
-                    }
-                }
-            }
-            .animation(.default, value: bottleVM.bottles)
-            .animation(.default, value: bottleFilter)
-            .listStyle(.sidebar)
-            .searchable(text: $bottleFilter, placement: .sidebar)
-            .onChange(of: newlyCreatedBottleURL) { _, url in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    selected = url
-                    withAnimation {
-                        proxy.scrollTo(url, anchor: .center)
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    var detail: some View {
-        if let bottle = selected {
-            if let bottle = bottleVM.bottles.first(where: { $0.url == bottle }) {
-                BottleView(bottle: bottle)
-                    .disabled(bottle.inFlight)
-                    .id(bottle.url)
-            }
-        } else {
-            if (bottleVM.bottles.isEmpty || bottleVM.countActive() == 0) && bottlesLoaded {
-                VStack {
-                    Text("main.createFirst")
-                    Button {
-                        showBottleCreation.toggle()
-                    } label: {
-                        HStack {
-                            Image(systemName: "plus")
-                            Text("button.createBottle")
-                        }
-                        .padding(6)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.accentColor)
-                }
-            }
-        }
-    }
-
-    var filteredBottles: [Bottle] {
-        if bottleFilter.isEmpty {
-            bottleVM.bottles
-                .sorted()
-        } else {
-            bottleVM.bottles
-                .filter { $0.settings.name.localizedCaseInsensitiveContains(bottleFilter) }
-                .sorted()
         }
     }
 }

@@ -26,7 +26,7 @@ struct WhiskyApp: App {
     @Environment(\.openURL) var openURL
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: LibraryPageButton.mainWindowID) {
             ContentView(showSetup: $showSetup)
                 .frame(minWidth: ViewWidth.large, minHeight: 316)
                 .environmentObject(BottleVM.shared)
@@ -38,6 +38,8 @@ struct WhiskyApp: App {
                     }
                 }
         }
+        // The Library puts its controls in its own panes (see LibraryTitleBar).
+        .windowStyle(.hiddenTitleBar)
         // Don't ask me how this works, it just does
         .handlesExternalEvents(matching: ["{same path of URL?}"])
         .commands {
@@ -56,6 +58,10 @@ struct WhiskyApp: App {
                 }
             }
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .appSettings) {
+                LibraryPageButton(title: "Settings…", page: .settings)
+                    .keyboardShortcut(",", modifiers: .command)
+            }
             CommandGroup(after: .newItem) {
                 Button("open.bottle") {
                     let panel = NSOpenPanel()
@@ -105,9 +111,6 @@ struct WhiskyApp: App {
                     }
                 }
             }
-        }
-        Settings {
-            SettingsView()
         }
     }
 
@@ -213,6 +216,29 @@ struct WhiskyApp: App {
         let cacheRoot = URL(fileURLWithPath: getconfOutputString.trimmingCharacters(in: .whitespacesAndNewlines))
         for cacheName in ["d3dm", "dxmt"] {
             try? FileManager.default.removeItem(at: cacheRoot.appending(path: cacheName))
+        }
+    }
+}
+
+/// Shows a page (Settings, Bottles) in the main window, opening the window if it was closed.
+private struct LibraryPageButton: View {
+    static let mainWindowID = "main"
+
+    let title: LocalizedStringKey
+    let page: LibraryPage
+
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button(title) {
+            LibraryNavigator.shared.show(page)
+            let hasMainWindow = NSApp.windows.contains { window in
+                window.isVisible && window.identifier?.rawValue.hasPrefix(Self.mainWindowID) == true
+            }
+            if !hasMainWindow {
+                openWindow(id: Self.mainWindowID)
+            }
+            NSApp.activate()
         }
     }
 }

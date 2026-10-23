@@ -117,16 +117,22 @@ public class Wine {
     /// Execute a `wine start /unix {url}` command returning the output result
     public static func runProgram(
         at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:],
+        graphicsBackend: GraphicsBackend? = nil,
         onStarted: (@Sendable () -> Void)? = nil
     ) async throws {
         let engine = try WhiskyWineInstaller.wineEngine(for: bottle.settings.wineEngineID)
         await pinResolvedEngineIfNeeded(for: bottle, engine: engine)
-        let backend = bottle.settings.graphicsBackend
+        // The bottle keeps its own renderer installed; a program's own choice is layered on top.
+        let bottleBackend = bottle.settings.graphicsBackend
+        let backend = graphicsBackend ?? bottleBackend
         try validateGraphicsBackend(backend, for: bottle, engine: engine)
-        let launchEnvironment = constructWineEnvironment(for: bottle, environment: environment, engine: engine)
+        let placement = try programRendererPlacement(for: backend, bottle: bottle, programURL: url, engine: engine)
+        let launchEnvironment = programLaunchEnvironment(
+            for: bottle, engine: engine, backend: backend, placement: placement, environment: environment
+        )
         try await prepareLaunchResources(
             bottlePath: bottle.url.path(percentEncoded: false),
-            backend: backend,
+            backend: bottleBackend,
             engineID: engine.id,
             initialize: {
                 try RendererStateStore.validateCurrentState(for: bottle, engine: engine)
@@ -140,23 +146,19 @@ public class Wine {
                     try? WinePrefixStateStore.recordInitialization(for: bottle, engine: engine)
                 }
             },
-            prepare: {
-                try prepareGraphicsBackend(backend, for: bottle, engine: engine)
-            }
+            prepare: { try prepareGraphicsBackend(bottleBackend, for: bottle, engine: engine) }
         )
+        let folder = url.deletingLastPathComponent()
+        try await acquireProgramFolder(folder, placement: placement, backend: backend,
+                                       bottle: bottle, bottleBackend: bottleBackend)
 
         do {
             let logFile = try makeLogFile()
             logFile.fileHandle.writeApplicaitonInfo()
-            logFile.fileHandle.writeInfo(for: bottle)
+            logFile.fileHandle.writeInfo(for: bottle, graphicsBackend: backend)
             let result = try await collectProgramOutput(context: ProgramOutputContext(
-                url: url,
-                args: args,
-                bottle: bottle,
-                environment: launchEnvironment,
-                engine: engine,
-                logFile: logFile,
-                onStarted: onStarted
+                url: url, args: args, bottle: bottle, environment: launchEnvironment,
+                engine: engine, logFile: logFile, onStarted: onStarted
             ))
 
             if let failure = WineLaunchFailure.failureToReport(
@@ -168,10 +170,10 @@ public class Wine {
                 throw failure
             }
         } catch {
-            await RendererExecutionCoordinator.shared.release(bottlePath: bottle.url.path, backend: backend)
+            await releaseLaunch(folder: folder, bottle: bottle, backend: bottleBackend)
             throw error
         }
-        await RendererExecutionCoordinator.shared.release(bottlePath: bottle.url.path, backend: backend)
+        await releaseLaunch(folder: folder, bottle: bottle, backend: bottleBackend)
     }
 
     /// Acquire the bottle renderer lock while Wine refreshes the prefix and renderer files are
@@ -208,28 +210,6 @@ public class Wine {
 
     static func runProgramDirectory(for url: URL) -> URL {
         url.deletingLastPathComponent()
-    }
-
-    public static func generateRunCommand(
-        at url: URL, bottle: Bottle, args: String, environment: [String: String]
-    ) -> String {
-        var wineCmd = "\(wineBinary(for: bottle).esc) start /wait /unix \(url.esc) \(args)"
-        let env = constructWineEnvironment(for: bottle, environment: environment)
-        for environment in env {
-            wineCmd = "\(environment.key)=\"\(environment.value)\" " + wineCmd
-        }
-
-        return wineCmd
-    }
-
-    public static func generateTerminalEnvironmentCommand(bottle: Bottle) -> String {
-        let env = constructWineEnvironment(for: bottle)
-        var cmd = "export WINE=\"\(wineBinary(for: bottle).path)\""
-        for (key, value) in env.sorted(by: { $0.key < $1.key }) {
-            cmd += "\nexport \(key)=\"\(value)\""
-        }
-
-        return cmd
     }
 
     /// Run a `wineserver` command with the given arguments and return the output result
@@ -350,18 +330,23 @@ public class Wine {
     static func constructWineEnvironment(
         for bottle: Bottle,
         environment: [String: String] = [:],
-        engine: WineEngine? = nil
+        engine: WineEngine? = nil,
+        graphicsBackend: GraphicsBackend? = nil
     ) -> [String: String] {
         var result: [String: String] = [
             "WINEPREFIX": bottle.url.path,
             "WINEDEBUG": "fixme-all",
             "GST_DEBUG": "1"
         ]
-        bottle.settings.environmentVariables(wineEnv: &result)
-        let resolvedEngine = engine ?? (try? WhiskyWineInstaller.wineEngine(for: bottle.settings.wineEngineID))
+        var settings = bottle.settings
+        if let graphicsBackend {
+            settings.graphicsBackend = graphicsBackend
+        }
+        settings.environmentVariables(wineEnv: &result)
+        let resolvedEngine = engine ?? (try? WhiskyWineInstaller.wineEngine(for: settings.wineEngineID))
         result.merge(
             WhiskyWineInstaller.graphicsEnvironment(
-                for: bottle.settings.graphicsBackend,
+                for: settings.graphicsBackend,
                 engineID: resolvedEngine?.id
             ),
             uniquingKeysWith: { _, newValue in newValue }

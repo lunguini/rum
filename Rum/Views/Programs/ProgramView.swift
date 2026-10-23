@@ -48,6 +48,7 @@ struct ProgramView: View {
                             Text(locale.pretty()).id(locale)
                         }
                     }
+                    LibraryRendererPicker(program: program, bottle: program.bottle)
                     VStack {
                         HStack {
                             Text("program.args")

@@ -34,15 +34,21 @@ extension Program {
         let environment = generateEnvironment()
         let programURL = self.url
         let programName = self.name
+        let graphicsBackend = self.graphicsBackend
 
         self.bottle.recordRun(url: programURL, name: programName)
-        DispatchQueue.main.async { self.bottle.runningPrograms.insert(programURL) }
+        DispatchQueue.main.async { self.bottle.programDidStart(programURL) }
 
         Task.detached(priority: .userInitiated) {
             do {
+                let bottle = self.bottle
                 try await Wine.runProgram(
-                    at: self.url, args: arguments, bottle: self.bottle, environment: environment,
-                    onStarted: onStarted
+                    at: self.url, args: arguments, bottle: bottle, environment: environment,
+                    graphicsBackend: graphicsBackend,
+                    onStarted: {
+                        DispatchQueue.main.async { bottle.programDidLaunch(programURL) }
+                        onStarted?()
+                    }
                 )
             } catch {
                 let errorMessage = error.localizedDescription
@@ -50,14 +56,15 @@ extension Program {
                     self.showRunError(message: errorMessage)
                 }
             }
-            DispatchQueue.main.async { self.bottle.runningPrograms.remove(programURL) }
+            DispatchQueue.main.async { self.bottle.programDidExit(programURL) }
             onFinished?()
         }
     }
 
     public func generateTerminalCommand() -> String {
         return Wine.generateRunCommand(
-            at: self.url, bottle: bottle, args: settings.arguments, environment: generateEnvironment()
+            at: self.url, bottle: bottle, args: settings.arguments, environment: generateEnvironment(),
+            graphicsBackend: graphicsBackend
         )
     }
 

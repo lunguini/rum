@@ -33,6 +33,23 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
         bottles = bottlesList.loadBottles()
     }
 
+    /// UserDefaults key of the bottle the Library's Run button uses.
+    static let defaultBottleKey = "libraryDefaultBottleURL"
+
+    /// Bottles that can run programs right now, sorted by name.
+    var availableBottles: [Bottle] {
+        bottles.filter { $0.isAvailable && !$0.inFlight }.sorted()
+    }
+
+    /// The bottle new programs run in: the user's choice if it is still available, otherwise the
+    /// first 64-bit bottle, otherwise any bottle.
+    func defaultBottle(preferredURL: URL?) -> Bottle? {
+        let bottles = availableBottles
+        return bottles.first { $0.url == preferredURL }
+            ?? bottles.first { $0.settings.architecture == .win64 }
+            ?? bottles.first
+    }
+
     func countActive() -> Int {
         return bottles.filter { $0.isAvailable == true }.count
     }

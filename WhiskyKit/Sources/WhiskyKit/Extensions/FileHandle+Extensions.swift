@@ -68,7 +68,8 @@ extension FileHandle {
         write(line: header)
     }
 
-    func writeInfo(for bottle: Bottle) {
+    func writeInfo(for bottle: Bottle, graphicsBackend: GraphicsBackend? = nil) {
+        let graphicsBackend = graphicsBackend ?? bottle.settings.graphicsBackend
         var header = String()
         header += "Bottle Name: \(bottle.settings.name)\n"
         header += "Bottle URL: \(bottle.url.path)\n\n"
@@ -88,14 +89,13 @@ extension FileHandle {
         header += "Bottle Wine Version: \(bottle.settings.wineVersion)\n"
         header += "Windows Version: \(bottle.settings.windowsVersion)\n"
         header += "Architecture: \(bottle.settings.architecture.rawValue)\n"
-        header += "Graphics Backend: \(bottle.settings.graphicsBackend.rawValue)\n"
+        header += "Graphics Backend: \(graphicsBackend.rawValue)\n"
         header += "Enhanced Sync: \(bottle.settings.enhancedSync)\n\n"
 
         header += "Metal HUD: \(bottle.settings.metalHud)\n"
         header += "Metal Trace: \(bottle.settings.metalTrace)\n\n"
 
-        if bottle.settings.graphicsBackend == .dxvk {
-            header += "DXVK: \(bottle.settings.dxvk)\n"
+        if graphicsBackend == .dxvk {
             header += "DXVK Async: \(bottle.settings.dxvkAsync)\n"
             header += "DXVK HUD: \(bottle.settings.dxvkHud)\n"
             let frameRate = bottle.settings.dxvkFrameRate

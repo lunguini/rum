@@ -29,7 +29,16 @@ public final class Bottle: ObservableObject, Equatable, Hashable, Identifiable, 
         didSet { saveSettings() }
     }
     @Published public var programs: [Program] = []
-    @Published public var runningPrograms: Set<URL> = []
+    /// Programs with at least one running instance. Updated through `programDidStart` and
+    /// `programDidExit` so programs launched several times are tracked per instance.
+    @Published public private(set) var runningPrograms: Set<URL> = []
+    /// Programs started from Rum that Wine hasn't launched yet: the bottle and graphics are being
+    /// prepared. See `programDidLaunch`.
+    @Published public private(set) var launchingPrograms: Set<URL> = []
+    private var runningInstanceCounts: [URL: Int] = [:]
+    private var launchingInstanceCounts: [URL: Int] = [:]
+    /// When the first of a program's running instances started.
+    private var runningSince: [URL: Date] = [:]
     @Published public var inFlight: Bool = false
     public var isAvailable: Bool = false
 
@@ -59,21 +68,15 @@ public final class Bottle: ObservableObject, Equatable, Hashable, Identifiable, 
             self.settings = BottleSettings()
         }
 
-        // Get rid of duplicates and pins that reference removed files
+        // Get rid of duplicates. Pins to missing files are kept so the user can locate or unpin
+        // them (an unmounted drive or a moved game folder shouldn't silently lose the pin);
+        // `pinnedPrograms` still hides them.
         var found: Set<URL> = []
         self.settings.pins = self.settings.pins.filter { pin in
             guard let url = pin.url else { return false }
             guard !found.contains(url) else { return false }
             found.insert(url)
-            let urlPath = url.path(percentEncoded: false)
-            let volume: URL?
-            do {
-                volume = try url.resourceValues(forKeys: [.volumeURLKey]).volume ?? nil
-            } catch {
-                volume = nil
-            }
-            let legallyRemoved = pin.removable && volume == nil
-            return FileManager.default.fileExists(atPath: urlPath) || legallyRemoved
+            return true
         }
     }
 
@@ -88,9 +91,69 @@ public final class Bottle: ObservableObject, Equatable, Hashable, Identifiable, 
         }
     }
 
+    /// Number of running instances of the program at `url` launched from Rum. Main thread only.
+    public func runningInstances(of url: URL) -> Int {
+        runningInstanceCounts[url] ?? 0
+    }
+
+    /// Whether an instance of the program at `url` is still being prepared. Main thread only.
+    public func isLaunching(_ url: URL) -> Bool {
+        launchingPrograms.contains(url)
+    }
+
+    /// When the program at `url` started running, if it is. Main thread only.
+    public func runningSince(_ url: URL) -> Date? {
+        runningSince[url]
+    }
+
+    /// Call on the main thread when an instance of a program starts. It counts as launching until
+    /// `programDidLaunch` or `programDidExit`.
+    public func programDidStart(_ url: URL, at date: Date = Date()) {
+        runningInstanceCounts[url, default: 0] += 1
+        launchingInstanceCounts[url, default: 0] += 1
+        if runningSince[url] == nil {
+            runningSince[url] = date
+        }
+        runningPrograms.insert(url)
+        launchingPrograms.insert(url)
+    }
+
+    /// Call on the main thread once Wine has launched an instance of the program.
+    public func programDidLaunch(_ url: URL) {
+        finishLaunching(url)
+    }
+
+    /// Call on the main thread when an instance of a program exits.
+    public func programDidExit(_ url: URL, at date: Date = Date()) {
+        finishLaunching(url)
+        let remaining = max((runningInstanceCounts[url] ?? 0) - 1, 0)
+        runningInstanceCounts[url] = remaining == 0 ? nil : remaining
+        if remaining == 0 {
+            if let start = runningSince.removeValue(forKey: url),
+               let index = settings.runHistory.firstIndex(where: { $0.url == url }) {
+                settings.runHistory[index].playTime += max(date.timeIntervalSince(start), 0)
+            }
+            runningPrograms.remove(url)
+        } else {
+            // Publish so instance counts shown in the UI update.
+            objectWillChange.send()
+        }
+    }
+
+    private func finishLaunching(_ url: URL) {
+        guard let count = launchingInstanceCounts[url] else { return }
+        if count > 1 {
+            launchingInstanceCounts[url] = count - 1
+            objectWillChange.send()
+        } else {
+            launchingInstanceCounts[url] = nil
+            launchingPrograms.remove(url)
+        }
+    }
+
     public func recordRun(url: URL, name: String) {
         if let index = settings.runHistory.firstIndex(where: { $0.url == url }) {
-            settings.runHistory[index].lastRun = Date()
+            settings.runHistory[index].recordRun()
         } else {
             settings.runHistory.append(RunHistoryEntry(name: name, url: url))
         }

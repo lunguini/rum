@@ -119,7 +119,7 @@ public struct PEFile: Hashable, Equatable, Sendable {
     ///   - handle: The `FileHandle` to read the resource table section from.
     ///   - types: Only read entrys of the given types. Only applies to the root table. Default includes all types.
     /// - Returns: The resource table section
-    private func rsrc(handle: FileHandle, types: [ResourceType] = ResourceType.allCases) -> ResourceDirectoryTable? {
+    func rsrc(handle: FileHandle, types: [ResourceType] = ResourceType.allCases) -> ResourceDirectoryTable? {
         if let resourceSection = sections.first(where: { $0.name == ".rsrc" }) {
             return ResourceDirectoryTable(
                 handle: handle,
