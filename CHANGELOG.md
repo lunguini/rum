@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0-alpha.1
+
+### Preview
+
+- First preview of Rum v2's game-library redesign, including library artwork and updated app branding.
+
 ## 1.2.1
 
 ### Fixes

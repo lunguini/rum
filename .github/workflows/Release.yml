@@ -27,6 +27,7 @@ jobs:
       - name: Build
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          APP_VERSION="${VERSION%%-*}"
           xcodebuild archive \
             -scheme Whisky \
             -archivePath ${{ runner.temp }}/Rum.xcarchive \
@@ -34,7 +35,7 @@ jobs:
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            MARKETING_VERSION="$VERSION"
+            MARKETING_VERSION="$APP_VERSION"
 
       - name: Export and Sign
         run: |
@@ -54,8 +55,10 @@ jobs:
         with:
           files: ${{ runner.temp }}/export/Rum.zip
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
 
       - name: Update Homebrew Cask
+        if: ${{ !contains(github.ref_name, '-') }}
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |

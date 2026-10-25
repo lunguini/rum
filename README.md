@@ -1,8 +1,7 @@
 <div align="center">
 
-<img src="./images/logo.png" alt="gocker logo" width="256">
+<img src="./images/rum-v2-header.png" alt="Rum" width="612">
 
-  # Rum 
   *Wine but a bit sweeter*
 
 

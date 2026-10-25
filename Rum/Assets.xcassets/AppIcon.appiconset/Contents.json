@@ -1,61 +1,61 @@
 {
   "images" : [
     {
-      "filename" : "logo 9.jpg",
+      "filename" : "RumIcon-16.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "16x16"
     },
     {
-      "filename" : "logo 8.jpg",
+      "filename" : "RumIcon-16@2x.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "16x16"
     },
     {
-      "filename" : "logo 7.jpg",
+      "filename" : "RumIcon-32.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "32x32"
     },
     {
-      "filename" : "logo 6.jpg",
+      "filename" : "RumIcon-32@2x.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "32x32"
     },
     {
-      "filename" : "logo 5.jpg",
+      "filename" : "RumIcon-128.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "128x128"
     },
     {
-      "filename" : "logo 4.jpg",
+      "filename" : "RumIcon-128@2x.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "128x128"
     },
     {
-      "filename" : "logo 3.jpg",
+      "filename" : "RumIcon-256.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "256x256"
     },
     {
-      "filename" : "logo 2.jpg",
+      "filename" : "RumIcon-256@2x.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "256x256"
     },
     {
-      "filename" : "logo 1.jpg",
+      "filename" : "RumIcon-512.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "512x512"
     },
     {
-      "filename" : "logo.jpg",
+      "filename" : "RumIcon-512@2x.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "512x512"
