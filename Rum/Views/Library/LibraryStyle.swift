@@ -180,7 +180,7 @@ struct ExeIconView: View {
                 Image(nsImage: icon)
                     .resizable()
                     .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
                     .shadow(color: .black.opacity(0.3), radius: size > 40 ? 6 : 0, y: size > 40 ? 3 : 0)
             } else if didLoad || ExeIconCache.isMissing(url) {
                 fallback
@@ -221,7 +221,7 @@ struct ExeIconBackdrop: View {
             if let icon = icon ?? ExeIconCache.cached(url) {
                 Image(nsImage: icon)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
                     .scaleEffect(1.8)
                     .blur(radius: 30)
                     .saturation(1.5)

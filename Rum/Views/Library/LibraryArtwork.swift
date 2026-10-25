@@ -45,7 +45,7 @@ struct ArtworkView: View {
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
                     .transition(.opacity)
             } else {
                 fallback
@@ -124,7 +124,7 @@ struct ArtworkPickerSheet: View {
                 } label: {
                     HStack(spacing: 10) {
                         AsyncImage(url: result.tinyImage) { image in
-                            image.resizable().aspectRatio(contentMode: .fill)
+                            image.resizable().scaledToFill()
                         } placeholder: {
                             Rectangle().fill(.quaternary)
                         }
