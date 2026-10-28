@@ -57,32 +57,45 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
 
-      - name: Update Homebrew Cask
-        if: ${{ !contains(github.ref_name, '-') }}
+      - name: Update Homebrew Casks
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          MAJOR="${VERSION%%.*}"
           SHA256=$(shasum -a 256 ${{ runner.temp }}/export/Rum.zip | awk '{print $1}')
 
-          python3 - "$VERSION" "$SHA256" "$HOMEBREW_TAP_TOKEN" <<'SCRIPT'
+          # "rum" tracks stable releases only; "rum@2" tracks the newest v2 build, including pre-releases
+          CASKS=()
+          if [[ "$VERSION" != *-* ]]; then
+            CASKS+=("rum")
+          fi
+          if [[ "$MAJOR" == "2" ]]; then
+            CASKS+=("rum@2")
+          fi
+
+          for CASK in "${CASKS[@]}"; do
+          python3 - "$VERSION" "$SHA256" "$HOMEBREW_TAP_TOKEN" "$CASK" <<'SCRIPT'
           import sys, json, base64, urllib.request
 
-          version, sha256, token = sys.argv[1], sys.argv[2], sys.argv[3]
+          version, sha256, token, cask_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+          other_cask = "rum@2" if cask_name == "rum" else "rum"
+          display_name = "Rum" if cask_name == "rum" else "Rum (v2)"
           repo = "lunguini/homebrew-tap"
-          path = "Casks/rum.rb"
+          path = f"Casks/{cask_name}.rb"
           api = f"https://api.github.com/repos/{repo}/contents/{path}"
           headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
 
-          cask = f'''cask "rum" do
+          cask = f'''cask "{cask_name}" do
           \tversion "{version}"
           \tsha256 "{sha256}"
 
           \turl "https://github.com/adrianlungu/rum/releases/download/v#{{version}}/Rum.zip"
-          \tname "Rum"
+          \tname "{display_name}"
           \tdesc "Wine wrapper for running Windows apps on macOS"
           \thomepage "https://github.com/adrianlungu/rum"
 
+          \tconflicts_with cask: "{other_cask}"
           \tdepends_on macos: ">= :sequoia"
           \tdepends_on arch: :arm64
 
@@ -113,11 +126,12 @@ jobs:
 
           # Push updated cask (omit sha to create, include to update)
           content = base64.b64encode(cask.encode()).decode()
-          body = {"message": f"Update rum to {version}", "content": content}
+          body = {"message": f"Update {cask_name} to {version}", "content": content}
           if file_sha:
               body["sha"] = file_sha
           payload = json.dumps(body).encode()
           req = urllib.request.Request(api, data=payload, headers=headers, method="PUT")
           with urllib.request.urlopen(req) as resp:
-              print(f"Updated cask to {version}: {resp.status}")
+              print(f"Updated {cask_name} cask to {version}: {resp.status}")
           SCRIPT
+          done
