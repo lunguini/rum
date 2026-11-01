@@ -9,7 +9,7 @@ Wine wrapper for running Windows apps on macOS, built with SwiftUI. Forked from 
 swiftlint --strict
 
 # Build (requires Xcode, macOS only)
-xcodebuild archive -scheme Whisky -configuration Release
+xcodebuild archive -scheme Rum -configuration Release
 ```
 
 **Important:** SwiftLint must be installed for the Xcode build to succeed — the Rum target has a SwiftLint build phase (`Script-6E50D98129CD0EAF008C39F6`) that runs during every build. Do not remove `brew install swiftlint` from the Release workflow.
@@ -28,7 +28,7 @@ xcodebuild archive -scheme Whisky -configuration Release
 
 ## Project Structure
 
-- **Rum/** — Main SwiftUI app (scheme: `Whisky`)
-- **WhiskyKit/** — Swift package with Wine/bottle management logic
+- **Rum/** — Main SwiftUI app (scheme: `Rum`)
+- **RumKit/** — Swift package with Wine/bottle management logic
 - **RumCmd/** — CLI tool
 - **RumThumbnail/** — QuickLook thumbnail extension for .exe files

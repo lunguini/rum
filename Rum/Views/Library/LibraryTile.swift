@@ -2,22 +2,22 @@
 //  LibraryTile.swift
 //  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 
 enum LibraryCardMetrics {
     static let minWidth: CGFloat = 150
@@ -30,6 +30,8 @@ enum LibraryCardMetrics {
 struct LibraryItemActions {
     var run: (LibraryPinItem) -> Void
     var stop: (LibraryPinItem) -> Void
+    /// Kills a hung program without asking it to close first.
+    var forceStop: (LibraryPinItem) -> Void
     /// Shows the program's settings in the details panel.
     var showSettings: (LibraryPinItem) -> Void
     /// Opens the full program settings page.
@@ -317,6 +319,7 @@ struct LibraryItemMenu: View {
             Button(status.isRunning ? "Run Another Instance" : "Play", systemImage: "play") { actions.run(item) }
             if status.isRunning {
                 Button("Stop", systemImage: "stop") { actions.stop(item) }
+                Button("Force Stop", systemImage: "xmark.octagon", role: .destructive) { actions.forceStop(item) }
             }
             Divider()
             if !isPinned {

@@ -354,7 +354,140 @@
       }
     },
     "button.cancel" : {
-
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إلغاء"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zrušit"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuller"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbrechen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peru"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annulla"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャンセル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "취소"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuleren"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anuluj"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anulează"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отмена"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İptal"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скасувати"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Huỷ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
     },
     "button.cDrive" : {
       "localizations" : {
@@ -14840,7 +14973,7 @@
         }
       }
     },
-    "settings.toggle.whisky.updates" : {
+    "settings.toggle.rum.updates" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -14976,7 +15109,7 @@
         }
       }
     },
-    "settings.toggle.whiskywine.updates" : {
+    "settings.toggle.rumwine.updates" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17288,7 +17421,7 @@
         }
       }
     },
-    "setup.whiskywine.download" : {
+    "setup.rumwine.download" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17424,7 +17557,7 @@
         }
       }
     },
-    "setup.whiskywine.download.subtitle" : {
+    "setup.rumwine.download.subtitle" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17560,7 +17693,7 @@
         }
       }
     },
-    "setup.whiskywine.eta" : {
+    "setup.rumwine.eta" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17696,7 +17829,7 @@
         }
       }
     },
-    "setup.whiskywine.install" : {
+    "setup.rumwine.install" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17832,7 +17965,7 @@
         }
       }
     },
-    "setup.whiskywine.install.subtitle" : {
+    "setup.rumwine.install.subtitle" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17968,7 +18101,7 @@
         }
       }
     },
-    "setup.whiskywine.progress" : {
+    "setup.rumwine.progress" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19081,7 +19214,7 @@
     "update.uptodate.title" : {
 
     },
-    "update.whiskywine.description" : {
+    "update.rumwine.description" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19217,7 +19350,7 @@
         }
       }
     },
-    "update.whiskywine.title" : {
+    "update.rumwine.title" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19353,7 +19486,7 @@
         }
       }
     },
-    "update.whiskywine.update" : {
+    "update.rumwine.update" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {

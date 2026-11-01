@@ -2,22 +2,22 @@
 //  LibraryInspector.swift
 //  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 
 enum LibraryInspectorTab: String, CaseIterable {
     case overview = "Overview"
@@ -100,7 +100,7 @@ struct LibraryInspector: View {
             // Finding the engine reads the engines folder; keep it off the main thread.
             let engineID = bottle.settings.wineEngineID
             engineName = await Task.detached(priority: .userInitiated) {
-                engineID.flatMap { WhiskyWineInstaller.wineEngine(withID: $0)?.displayName } ?? "Default"
+                engineID.flatMap { RumWineInstaller.wineEngine(withID: $0)?.displayName } ?? "Default"
             }.value
         }
     }
@@ -264,7 +264,7 @@ struct LibraryRendererPicker: View {
             let engineID = bottle.settings.wineEngineID
             let bottleBackend = bottle.settings.graphicsBackend
             available = await Task.detached(priority: .userInitiated) {
-                WhiskyWineInstaller.graphicsBackendAvailability(for: architecture, engineID: engineID)
+                RumWineInstaller.graphicsBackendAvailability(for: architecture, engineID: engineID)
                     .filter(\.isAvailable)
                     .map(\.backend)
                     .filter { $0 == bottleBackend || ProgramRenderer.supportsProgramOverride($0, engineID: engineID) }

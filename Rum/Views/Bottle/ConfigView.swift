@@ -1,23 +1,23 @@
 //
 //  ConfigView.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 
 enum LoadingState {
     case loading
@@ -151,10 +151,10 @@ struct ConfigView: View {
             }
         }
         .formStyle(.grouped)
-        .animation(.whiskyDefault, value: wineSectionExpanded)
-        .animation(.whiskyDefault, value: runtimeSectionExpanded)
-        .animation(.whiskyDefault, value: dxvkSectionExpanded)
-        .animation(.whiskyDefault, value: metalSectionExpanded)
+        .animation(.rumDefault, value: wineSectionExpanded)
+        .animation(.rumDefault, value: runtimeSectionExpanded)
+        .animation(.rumDefault, value: dxvkSectionExpanded)
+        .animation(.rumDefault, value: metalSectionExpanded)
         .bottomBar {
             HStack {
                 Spacer()

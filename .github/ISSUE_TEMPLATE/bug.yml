@@ -27,14 +27,14 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Please provide the logs from the launched Wine process. These can be found by pressing `CMD + L` in Whisky.
+      description: Please provide the logs from the launched Wine process. These can be found by pressing `CMD + L` in Rum.
       render: bash
     validations:
       required: true
   - type: dropdown
     id: whisky-version
     attributes:
-      label: What version of Whisky are you using?
+      label: What version of Rum are you using?
       options:
         - "2.3.2"
         - "<2.3.2"

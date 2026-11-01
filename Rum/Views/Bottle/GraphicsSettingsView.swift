@@ -1,23 +1,23 @@
 //
 //  GraphicsSettingsView.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 
 struct GraphicsSettingsView: View {
     @ObservedObject var bottle: Bottle
@@ -116,11 +116,11 @@ struct GraphicsSettingsView: View {
     }
 
     private func loadAvailability() {
-        let resolvedCapabilities = WhiskyWineInstaller.wineGraphicsCapabilities(
+        let resolvedCapabilities = RumWineInstaller.wineGraphicsCapabilities(
             for: bottle.settings.wineEngineID
         )
         capabilities = resolvedCapabilities
-        availability = WhiskyWineInstaller.graphicsBackendAvailability(
+        availability = RumWineInstaller.graphicsBackendAvailability(
             for: bottle.settings.architecture,
             engineID: bottle.settings.wineEngineID
         )
@@ -128,7 +128,7 @@ struct GraphicsSettingsView: View {
             current: bottle.settings.graphicsBackend,
             architecture: bottle.settings.architecture,
             capabilities: resolvedCapabilities,
-            dxvkInstalled: WhiskyWineInstaller.isDXVKInstalled(for: bottle.settings.architecture)
+            dxvkInstalled: RumWineInstaller.isDXVKInstalled(for: bottle.settings.architecture)
         )
         guard resolution.didFallback else {
             rendererFallbackMessage = nil

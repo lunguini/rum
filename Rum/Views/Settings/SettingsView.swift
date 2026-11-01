@@ -1,35 +1,35 @@
 //
 //  SettingsView.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 
 struct SettingsView: View {
-    @AppStorage("SUEnableAutomaticChecks") var whiskyUpdate = true
+    @AppStorage("SUEnableAutomaticChecks") var rumUpdate = true
     @AppStorage("killOnTerminate") var killOnTerminate = true
-    @AppStorage("checkWhiskyWineUpdates") var checkWhiskyWineUpdates = true
+    @AppStorage("checkRumWineUpdates") var checkRumWineUpdates = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
     @AppStorage(BottleVM.defaultBottleKey) private var defaultBottleURL: URL?
     @EnvironmentObject var bottleVM: BottleVM
     @State private var showWineManager = false
     @State private var showBottleCreation = false
     @State private var newlyCreatedBottleURL: URL?
-    @State private var activeWineVersion = WhiskyWineInstaller.installedWineVersion()
+    @State private var activeWineVersion = RumWineInstaller.installedWineVersion()
     /// The bottle whose own settings are shown in place of these; nil shows Settings.
     @Binding var managedBottleURL: URL?
 
@@ -66,8 +66,8 @@ struct SettingsView: View {
             }
             bottlesSection
             Section("settings.updates") {
-                Toggle("settings.toggle.whisky.updates", isOn: $whiskyUpdate)
-                Toggle("settings.toggle.whiskywine.updates", isOn: $checkWhiskyWineUpdates)
+                Toggle("settings.toggle.rum.updates", isOn: $rumUpdate)
+                Toggle("settings.toggle.rumwine.updates", isOn: $checkRumWineUpdates)
             }
             Section("Wine") {
                 HStack {
@@ -162,12 +162,12 @@ struct SettingsView: View {
     private func bottleDetails(_ bottle: Bottle) -> String {
         guard bottle.isAvailable else { return "Unavailable" }
         let engine = bottle.settings.wineEngineID
-            .flatMap { WhiskyWineInstaller.wineEngine(withID: $0)?.displayName } ?? "Default engine"
+            .flatMap { RumWineInstaller.wineEngine(withID: $0)?.displayName } ?? "Default engine"
         return "\(bottle.settings.architecture.pretty()) · \(engine)"
     }
 
     private func refreshActiveWineVersion() {
-        activeWineVersion = WhiskyWineInstaller.installedWineVersion()
+        activeWineVersion = RumWineInstaller.installedWineVersion()
     }
 }
 

@@ -1,18 +1,18 @@
 //
 //  AppDelegate.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
@@ -26,9 +26,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Test if automatic window tabbing is enabled
         // as it is disabled when ContentView appears
         if NSWindow.allowsAutomaticWindowTabbing, let url = urls.first {
-            // Reopen the file after Whisky has been opened
+            // Reopen the file after Rum has been opened
             // so that the `onOpenURL` handler is actually called
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        Self.migrateLegacyDefaults()
+    }
+
+    /// Moves settings saved under pre-rename keys to their new names. Runs before any window
+    /// reads them, and only once: the old key is removed afterwards.
+    static func migrateLegacyDefaults() {
+        let defaults = UserDefaults.standard
+        let renamedKeys = ["checkWhiskyWineUpdates": "checkRumWineUpdates"]
+        for (oldKey, newKey) in renamedKeys {
+            guard let value = defaults.object(forKey: oldKey) else { continue }
+            if defaults.object(forKey: newKey) == nil {
+                defaults.set(value, forKey: newKey)
+            }
+            defaults.removeObject(forKey: oldKey)
         }
     }
 
@@ -48,7 +66,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Block (bounded) until the bottles are actually killed. This delegate method is always
             // called on the main thread, so assuming main-actor isolation here is safe.
             MainActor.assumeIsolated {
-                WhiskyApp.killBottlesAndWaitBlocking()
+                RumApp.killBottlesAndWaitBlocking()
             }
         }
     }

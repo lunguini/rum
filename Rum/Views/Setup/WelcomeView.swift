@@ -1,27 +1,27 @@
 //
 //  WelcomeView.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 
 struct WelcomeView: View {
     @State var rosettaInstalled: Bool?
-    @State var whiskyWineInstalled: Bool?
+    @State var rumWineInstalled: Bool?
     @State var dxvkInstalled: Bool?
     @State var shouldCheckInstallStatus: Bool = false
     @State private var showWineManager = false
@@ -31,17 +31,17 @@ struct WelcomeView: View {
 
     private var allInstalled: Bool {
         rosettaInstalled == true
-        && whiskyWineInstalled == true
+        && rumWineInstalled == true
         && dxvkInstalled == true
     }
 
     private var requiredDependenciesInstalled: Bool {
-        rosettaInstalled == true && whiskyWineInstalled == true
+        rosettaInstalled == true && rumWineInstalled == true
     }
 
     private var anyRequiredMissing: Bool {
         rosettaInstalled == false
-        || whiskyWineInstalled == false
+        || rumWineInstalled == false
     }
 
     var body: some View {
@@ -69,7 +69,7 @@ struct WelcomeView: View {
                 InstallStatusView(isInstalled: $rosettaInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
                                   name: "Rosetta")
-                InstallStatusView(isInstalled: $whiskyWineInstalled,
+                InstallStatusView(isInstalled: $rumWineInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
                                   showUninstall: true,
                                   manageAction: {
@@ -91,7 +91,7 @@ struct WelcomeView: View {
             Spacer()
             HStack {
                 if rosettaInstalled != nil,
-                   whiskyWineInstalled != nil,
+                   rumWineInstalled != nil,
                    dxvkInstalled != nil {
                     if anyRequiredMissing {
                         Button("setup.quit") {
@@ -128,8 +128,8 @@ struct WelcomeView: View {
 
     func checkInstallStatus() {
         rosettaInstalled = Rosetta2.isRosettaInstalled
-        whiskyWineInstalled = WhiskyWineInstaller.isWhiskyWineInstalled()
-        dxvkInstalled = WhiskyWineInstaller.isDXVKInstalled()
+        rumWineInstalled = RumWineInstaller.isRumWineInstalled()
+        dxvkInstalled = RumWineInstaller.isDXVKInstalled()
     }
 
     private func advanceSetup() {
@@ -138,8 +138,8 @@ struct WelcomeView: View {
             return
         }
 
-        if whiskyWineInstalled == false {
-            path.append(.whiskyWineDownload)
+        if rumWineInstalled == false {
+            path.append(.rumWineDownload)
             return
         }
 
@@ -202,7 +202,7 @@ struct InstallStatusView: View {
 
     func uninstall() {
         if name == "Wine" {
-            WhiskyWineInstaller.uninstall()
+            RumWineInstaller.uninstall()
         }
 
         shouldCheckInstallStatus.toggle()

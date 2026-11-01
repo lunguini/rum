@@ -29,7 +29,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           APP_VERSION="${VERSION%%-*}"
           xcodebuild archive \
-            -scheme Whisky \
+            -scheme Rum \
             -archivePath ${{ runner.temp }}/Rum.xcarchive \
             -configuration Release \
             CODE_SIGN_IDENTITY="-" \

@@ -1,0 +1,124 @@
+//
+//  Program+Extensions.swift
+//  Rum
+//
+//  This file is part of Rum.
+//
+//  Rum is free software: you can redistribute it and/or modify it under the terms
+//  of the GNU General Public License as published by the Free Software Foundation,
+//  either version 3 of the License, or (at your option) any later version.
+//
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+//  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Rum.
+//  If not, see https://www.gnu.org/licenses/.
+//
+
+import Foundation
+import AppKit
+import os.log
+
+extension Program {
+    public func run(onStarted: (@Sendable () -> Void)? = nil, onFinished: (@Sendable () -> Void)? = nil) {
+        if NSEvent.modifierFlags.contains(.shift) {
+            self.runInTerminal()
+        } else {
+            self.runInWine(onStarted: onStarted, onFinished: onFinished)
+        }
+    }
+
+    func runInWine(onStarted: (@Sendable () -> Void)? = nil, onFinished: (@Sendable () -> Void)? = nil) {
+        let arguments = settings.arguments.split { $0.isWhitespace }.map(String.init)
+        let environment = generateEnvironment()
+        let programURL = self.url
+        let programName = self.name
+        let graphicsBackend = self.graphicsBackend
+
+        self.bottle.recordRun(url: programURL, name: programName)
+        DispatchQueue.main.async { self.bottle.programDidStart(programURL) }
+
+        Task.detached(priority: .userInitiated) {
+            do {
+                let bottle = self.bottle
+                let folder = programURL.deletingLastPathComponent()
+                guard FolderAccess.canRead(folder) else {
+                    throw WineLaunchFailure.folderAccessDenied(folder: folder)
+                }
+                try await Wine.runProgram(
+                    at: self.url, args: arguments, bottle: bottle, environment: environment,
+                    graphicsBackend: graphicsBackend,
+                    onStarted: {
+                        DispatchQueue.main.async { bottle.programDidLaunch(programURL) }
+                        onStarted?()
+                    }
+                )
+            } catch {
+                let errorMessage = error.localizedDescription
+                let needsFolderAccess = (error as? WineLaunchFailure)?.reason == .folderAccessDenied
+                DispatchQueue.main.async {
+                    self.showRunError(message: errorMessage, offerPrivacySettings: needsFolderAccess)
+                }
+            }
+            DispatchQueue.main.async { self.bottle.programDidExit(programURL) }
+            onFinished?()
+        }
+    }
+
+    public func generateTerminalCommand() -> String {
+        return Wine.generateRunCommand(
+            at: self.url, bottle: bottle, args: settings.arguments, environment: generateEnvironment(),
+            graphicsBackend: graphicsBackend
+        )
+    }
+
+    public func runInTerminal() {
+        let wineCmd = generateTerminalCommand().replacingOccurrences(of: "\\", with: "\\\\")
+
+        let script = """
+        tell application "Terminal"
+            activate
+            do script "\(wineCmd)"
+        end tell
+        """
+
+        Task.detached(priority: .userInitiated) {
+            var error: NSDictionary?
+            guard let appleScript = NSAppleScript(source: script) else { return }
+            appleScript.executeAndReturnError(&error)
+
+            if let error = error {
+                Logger.wineKit.error("Failed to run terminal script \(error)")
+                guard let description = error["NSAppleScriptErrorMessage"] as? String else { return }
+                await self.showRunError(message: String(describing: description))
+            }
+        }
+    }
+
+    @MainActor private func showRunError(message: String, offerPrivacySettings: Bool = false) {
+        let alert = NSAlert()
+        alert.messageText = String(localized: "alert.message")
+        alert.informativeText = String(localized: "alert.info")
+        + " \(self.url.lastPathComponent): "
+        + message
+        alert.alertStyle = .critical
+        if offerPrivacySettings {
+            alert.addButton(withTitle: "Open Privacy Settings")
+            alert.addButton(withTitle: String(localized: "button.cancel"))
+        } else {
+            alert.addButton(withTitle: String(localized: "button.ok"))
+        }
+        let handle: (NSApplication.ModalResponse) -> Void = { response in
+            if offerPrivacySettings && response == .alertFirstButtonReturn,
+               let url = FolderAccess.privacySettingsURL {
+                NSWorkspace.shared.open(url)
+            }
+        }
+        if let window = NSApp.keyWindow {
+            alert.beginSheetModal(for: window, completionHandler: handle)
+        } else {
+            handle(alert.runModal())
+        }
+    }
+}

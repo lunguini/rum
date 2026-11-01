@@ -1,23 +1,23 @@
 //
 //  DXVKDownloadView.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 
 struct DXVKDownloadView: View {
     @State private var fractionProgress: Double = 0
@@ -54,7 +54,7 @@ struct DXVKDownloadView: View {
                         ProgressView(value: fractionProgress, total: 1)
                         HStack {
                             Text(String(
-                                format: String(localized: "setup.whiskywine.progress"),
+                                format: String(localized: "setup.rumwine.progress"),
                                 formatBytes(bytes: completedBytes),
                                 formatBytes(bytes: totalBytes)
                             ))
@@ -72,7 +72,7 @@ struct DXVKDownloadView: View {
         .frame(width: 400, height: 200)
         .onAppear {
             Task {
-                guard let url = await WhiskyWineInstaller.fetchLatestDXVKRelease() else {
+                guard let url = await RumWineInstaller.fetchLatestDXVKRelease() else {
                     fetchFailed = true
                     return
                 }

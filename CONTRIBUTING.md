@@ -1,14 +1,14 @@
 # How to contribute
 
-Thanks for your interest! First, make a fork of Whisky, make a new branch for your changes, and get coding!
+Thanks for your interest! First, make a fork of Rum, make a new branch for your changes, and get coding!
 
 # Build environment
 
-Whisky is built using Xcode 15 on macOS Sonoma. All external dependencies are handled through the Swift Package Manager.
+Rum is built using Xcode 15 on macOS Sonoma. All external dependencies are handled through the Swift Package Manager.
 
 # Code style
 
-Every Whisky commit is automatically linted using SwiftLint. You can run these checks locally simply by building in Xcode, violations will appear as errors or warnings. For your pull request to be merged, you must meet all the requirements outlined by SwiftLint and have no violations.
+Every Rum commit is automatically linted using SwiftLint. You can run these checks locally simply by building in Xcode, violations will appear as errors or warnings. For your pull request to be merged, you must meet all the requirements outlined by SwiftLint and have no violations.
 
 Generally, it is not advised to disable a SwiftLint rule, but there are certain situations where it is necessary. Please use your discretion when disabling rules temporarily.
 

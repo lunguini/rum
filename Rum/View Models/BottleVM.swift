@@ -1,24 +1,24 @@
 //
 //  BottleVM.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import Foundation
 import SemanticVersion
-import WhiskyKit
+import RumKit
 
 // swiftlint:disable:next todo
 // TODO: Don't use unchecked!
@@ -74,12 +74,12 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
 
                 await MainActor.run {
                     self.bottles.append(bottle)
-                    if !WhiskyWineInstaller.isDXVKInstalled() {
+                    if !RumWineInstaller.isDXVKInstalled() {
                         bottle.settings.graphicsBackend = .wineD3D
                     }
                     // Pin new bottles to the engine that created their prefix. Existing bottles
                     // with a nil ID continue to follow the global default for compatibility.
-                    if let activeEngine = try? WhiskyWineInstaller.wineEngine(for: nil) {
+                    if let activeEngine = try? RumWineInstaller.wineEngine(for: nil) {
                         bottle.settings.wineEngineID = activeEngine.id
                     }
                     bottle.settings.windowsVersion = winVersion

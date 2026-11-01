@@ -19,8 +19,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Run WhiskyKit tests
-        run: swift test --package-path WhiskyKit
+      - name: Run RumKit tests
+        run: swift test --package-path RumKit
 
   canary-harness:
     runs-on: macos-15

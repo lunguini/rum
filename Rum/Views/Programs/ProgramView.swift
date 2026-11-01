@@ -1,23 +1,23 @@
 //
 //  ProgramView.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 import UniformTypeIdentifiers
 
 struct ProgramView: View {
@@ -129,9 +129,9 @@ struct ProgramView: View {
             .navigationTitle(program.name)
             .formStyle(.grouped)
         }
-        .animation(.whiskyDefault, value: programLoading)
-        .animation(.whiskyDefault, value: configSectionExpanded)
-        .animation(.whiskyDefault, value: envArgsSectionExpanded)
+        .animation(.rumDefault, value: programLoading)
+        .animation(.rumDefault, value: configSectionExpanded)
+        .animation(.rumDefault, value: envArgsSectionExpanded)
         .task {
             if let fetchedImage = program.peFile?.bestIcon() { self.cachedIconImage = Image(nsImage: fetchedImage) }
         }

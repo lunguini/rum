@@ -1,4 +1,4 @@
-SCHEME := Whisky
+SCHEME := Rum
 PROJECT := Rum.xcodeproj
 DERIVED := build
 APP_DEBUG := $(DERIVED)/Build/Products/Debug/Rum.app
@@ -31,13 +31,13 @@ lint:
 	swiftlint --strict
 
 test:
-	swift test --package-path WhiskyKit
+	swift test --package-path RumKit
 
 graphics-canary:
 	./scripts/graphics-canary.sh
 
 kill:
-	-pkill -x Whisky
+	-pkill -x Rum
 
 clean:
 	rm -rf $(DERIVED)
