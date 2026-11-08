@@ -56,8 +56,10 @@ public class RumWineInstaller {
     /// URL to the installed `wine` `bin` directory
     public static let binFolder: URL = libraryFolder.appending(path: "Wine").appending(path: "bin")
 
+    /// Whether a usable global default Wine engine exists. A version file alone isn't enough:
+    /// an imported CrossOver may have been deleted, or a managed build removed by hand.
     public static func isRumWineInstalled() -> Bool {
-        return installedWineVersion() != nil
+        (try? wineEngine(for: nil)) != nil
     }
 
     /// Install a Wine build from a downloaded tarball.

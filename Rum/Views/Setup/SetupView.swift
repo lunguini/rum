@@ -18,12 +18,13 @@
 
 import SwiftUI
 
-enum SetupStage {
+enum SetupStage: Hashable {
     case rosetta
     case rumWineDownload
     case rumWineInstall
     case dxvkDownload
     case dxvkInstall
+    case install(SetupPlan)
 }
 
 struct SetupView: View {
@@ -60,6 +61,8 @@ struct SetupView: View {
                                 tarLocation: $tarLocation,
                                 path: $path
                             )
+                        case .install(let plan):
+                            SetupInstallView(plan: plan, showSetup: $showSetup)
                         case .dxvkInstall:
                             DXVKInstallView(
                                 tarLocation: $tarLocation,

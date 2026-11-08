@@ -61,55 +61,89 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
         bottleURL: URL
     ) -> URL {
         let newBottleDir = bottleURL.appending(path: UUID().uuidString)
-
         Task.detached {
-            var bottleId: Bottle?
             do {
-                try FileManager.default.createDirectory(
-                    atPath: newBottleDir.path(percentEncoded: false),
-                    withIntermediateDirectories: true
+                try await self.createBottle(
+                    at: newBottleDir, name: bottleName, winVersion: winVersion, architecture: architecture
                 )
-                let bottle = Bottle(bottleUrl: newBottleDir, inFlight: true)
-                bottleId = bottle
-
-                await MainActor.run {
-                    self.bottles.append(bottle)
-                    if !RumWineInstaller.isDXVKInstalled() {
-                        bottle.settings.graphicsBackend = .wineD3D
-                    }
-                    // Pin new bottles to the engine that created their prefix. Existing bottles
-                    // with a nil ID continue to follow the global default for compatibility.
-                    if let activeEngine = try? RumWineInstaller.wineEngine(for: nil) {
-                        bottle.settings.wineEngineID = activeEngine.id
-                    }
-                    bottle.settings.windowsVersion = winVersion
-                    bottle.settings.architecture = architecture
-                    bottle.settings.name = bottleName
-                }
-
-                try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
-                let wineVer = try await Wine.wineVersion(bottle: bottle)
-
-                await MainActor.run {
-                    bottle.settings.wineVersion = SemanticVersion(wineVer)
-                        ?? SemanticVersion(0, 0, 0)
-                    self.bottlesList.paths.append(newBottleDir)
-                    self.loadBottles()
-                }
             } catch {
                 print("Failed to create new bottle: \(error)")
-                if let bottle = bottleId {
-                    await MainActor.run {
-                        if let index = self.bottles.firstIndex(of: bottle) {
-                            self.bottles.remove(at: index)
-                        }
-                    }
-                }
-                // Best-effort cleanup of the directory created above so a failed creation
-                // doesn't leave an orphaned prefix on disk.
-                try? FileManager.default.removeItem(at: newBottleDir)
             }
         }
         return newBottleDir
+    }
+
+    /// Creates the "Default" 64-bit bottle the Library runs programs in, and makes it the default.
+    /// Used by setup so beginners never have to create a bottle themselves.
+    func createDefaultBottle() async throws -> URL {
+        let location = UserDefaults.standard.url(forKey: "defaultBottleLocation") ?? BottleData.defaultBottleDir
+        let url = location.appending(path: UUID().uuidString)
+        try await createBottle(at: url, name: "Default", winVersion: .win10, architecture: .win64)
+        UserDefaults.standard.set(url, forKey: Self.defaultBottleKey)
+        return url
+    }
+
+    /// The best renderer the engine can use: DXMT, then DXVK, then WineD3D (always available).
+    static func preferredGraphicsBackend(
+        for architecture: BottleArchitecture,
+        engineID: String?
+    ) -> GraphicsBackend {
+        let available = RumWineInstaller.graphicsBackendAvailability(for: architecture, engineID: engineID)
+            .filter(\.isAvailable).map(\.backend)
+        return [GraphicsBackend.dxmt, .dxvk].first(where: available.contains) ?? .wineD3D
+    }
+
+    /// Creates and boots a prefix at `newBottleDir`. Returns once Wine has finished setting it up.
+    func createBottle(
+        at newBottleDir: URL,
+        name bottleName: String,
+        winVersion: WinVersion,
+        architecture: BottleArchitecture
+    ) async throws {
+        var bottleId: Bottle?
+        do {
+            try FileManager.default.createDirectory(
+                atPath: newBottleDir.path(percentEncoded: false),
+                withIntermediateDirectories: true
+            )
+            let bottle = Bottle(bottleUrl: newBottleDir, inFlight: true)
+            bottleId = bottle
+
+            await MainActor.run {
+                self.bottles.append(bottle)
+                // Pin new bottles to the engine that created their prefix. Existing bottles
+                // with a nil ID continue to follow the global default for compatibility.
+                let engineID = (try? RumWineInstaller.wineEngine(for: nil))?.id
+                bottle.settings.wineEngineID = engineID
+                bottle.settings.graphicsBackend = Self.preferredGraphicsBackend(
+                    for: architecture, engineID: engineID
+                )
+                bottle.settings.windowsVersion = winVersion
+                bottle.settings.architecture = architecture
+                bottle.settings.name = bottleName
+            }
+
+            try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
+            let wineVer = try await Wine.wineVersion(bottle: bottle)
+
+            await MainActor.run {
+                bottle.settings.wineVersion = SemanticVersion(wineVer)
+                    ?? SemanticVersion(0, 0, 0)
+                self.bottlesList.paths.append(newBottleDir)
+                self.loadBottles()
+            }
+        } catch {
+            if let bottle = bottleId {
+                await MainActor.run {
+                    if let index = self.bottles.firstIndex(of: bottle) {
+                        self.bottles.remove(at: index)
+                    }
+                }
+            }
+            // Best-effort cleanup of the directory created above so a failed creation
+            // doesn't leave an orphaned prefix on disk.
+            try? FileManager.default.removeItem(at: newBottleDir)
+            throw error
+        }
     }
 }

@@ -77,13 +77,8 @@ struct RumWineInstallView: View {
         }
     }
 
+    /// Back to the overview, which re-checks everything and offers the optional runtimes.
     func proceed() {
-        if !RumWineInstaller.isDXVKInstalled() {
-            // DXVK is optional when WineD3D or an imported Metal backend is available. Return to
-            // the dependency overview so the user can continue without it or install it next.
-            path.removeAll()
-        } else {
-            showSetup = false
-        }
+        path.removeAll()
     }
 }

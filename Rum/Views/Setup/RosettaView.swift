@@ -105,12 +105,8 @@ struct RosettaView: View {
 
     @MainActor
     func proceed() {
-        if !RumWineInstaller.isRumWineInstalled() {
-            path.append(.rumWineDownload)
-            return
-        }
-
-        showSetup = false
+        // Back to the overview, which offers the Basic and Advanced installs next.
+        path.removeAll()
     }
 }
 

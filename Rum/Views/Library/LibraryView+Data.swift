@@ -300,22 +300,19 @@ extension LibraryView {
 
     func handleDrop(providers: [NSItemProvider]) -> Bool {
         guard let bottle = defaultBottle else { return false }
-        var didAccept = false
-        for provider in providers {
-            guard provider.canLoadObject(ofClass: URL.self),
-                  let suggestedName = provider.suggestedName,
-                  Self.runnableExtensions.contains((suggestedName as NSString).pathExtension.lowercased()) else {
-                continue
-            }
-            didAccept = true
+        // Finder's providers often have no `suggestedName`, or one without the extension, so
+        // the file type can only be checked once the URL is loaded.
+        let fileProviders = providers.filter { $0.canLoadObject(ofClass: URL.self) }
+        for provider in fileProviders {
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url, Self.runnableExtensions.contains(url.pathExtension.lowercased()) else { return }
+                guard let url, url.isFileURL,
+                      Self.runnableExtensions.contains(url.pathExtension.lowercased()) else { return }
                 Task { @MainActor in
                     pin(url, name: url.deletingPathExtension().lastPathComponent, in: bottle)
                 }
             }
         }
-        return didAccept
+        return !fileProviders.isEmpty
     }
 }
 

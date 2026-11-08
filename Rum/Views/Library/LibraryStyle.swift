@@ -42,6 +42,33 @@ extension ShapeStyle where Self == LinearGradient {
 // MARK: - Buttons
 
 /// The Library's main call to action (Play, Run Windows App…): amber, or red to stop.
+/// A native-sized push button (like Search beside it) filled with the logo's warm gradient.
+struct RumTitleBarButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var isHovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.medium))
+            .foregroundStyle(.white)
+            .labelStyle(.titleAndIcon)
+            .padding(.horizontal, 12)
+            .frame(height: 26)
+            .background {
+                Capsule()
+                    .fill(.rumGradient)
+                    .brightness(configuration.isPressed ? -0.08 : (isHovering ? 0.04 : 0))
+            }
+            .overlay {
+                Capsule()
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 0.5)
+            }
+            .opacity(isEnabled ? 1 : 0.45)
+            .contentShape(Capsule())
+            .onHover { isHovering = $0 }
+    }
+}
+
 struct RumProminentButtonStyle: ButtonStyle {
     enum Role {
         case play, stop
@@ -281,5 +308,20 @@ struct LibrarySearchField: View {
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
+    }
+}
+
+extension View {
+    /// Adds dropped programs to the Library, outlining the page while a file is dragged over it.
+    func acceptsProgramDrops(isTargeted: Binding<Bool>,
+                             perform: @escaping ([NSItemProvider]) -> Bool) -> some View {
+        overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.rum, lineWidth: 2)
+                .padding(4)
+                .opacity(isTargeted.wrappedValue ? 1 : 0)
+                .allowsHitTesting(false)
+        }
+        .onDrop(of: [.fileURL], isTargeted: isTargeted, perform: perform)
     }
 }

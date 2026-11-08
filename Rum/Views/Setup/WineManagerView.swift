@@ -79,8 +79,8 @@ struct WineManagerView: View {
                             )
                                 .foregroundStyle(.secondary)
                         }
-                    } footer: {
-                        Text(externalEngineLicenseNote)
+                    } header: {
+                        InfoHeader("Import", note: externalEngineLicenseNote)
                     }
                     DXMTRuntimeSection()
                     if !externalEngines.isEmpty {
@@ -112,10 +112,9 @@ struct WineManagerView: View {
                             }
                         }
                     } header: {
-                        Text("Available Sikarugir Downloads")
-                    } footer: {
-                        Text(
-                            "Sikarugir engines are third-party Wine builds. "
+                        InfoHeader(
+                            "Available Sikarugir Downloads",
+                            note: "Sikarugir engines are third-party Wine builds. "
                                 + "Review their licenses and compatibility before use. "
                                 + "The first install also fetches the official template support files."
                         )
@@ -129,6 +128,7 @@ struct WineManagerView: View {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.red)
                         .lineLimit(2)
+                        .help(errorMessage)
                 }
                 Spacer()
                 Button("Close") {
@@ -172,17 +172,14 @@ struct WineManagerView: View {
                 HStack(spacing: 6) {
                     if isActive {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.tint)
+                            .foregroundStyle(.green)
                     }
                     Text(engine.displayName)
                         .fontWeight(isActive ? .semibold : .regular)
                 }
-                Text(engine.appURL.path(percentEncoded: false))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             Spacer()
+            InfoButton(details: [engine.appURL.path(percentEncoded: false)])
             if !engine.isAvailable {
                 Text("Missing")
                     .foregroundStyle(.red)
@@ -209,7 +206,7 @@ struct WineManagerView: View {
                 HStack(spacing: 6) {
                     if build.isActive {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.tint)
+                            .foregroundStyle(.green)
                     }
                     Text(build.displayName)
                         .fontWeight(build.isActive ? .semibold : .regular)
@@ -217,12 +214,9 @@ struct WineManagerView: View {
                 Text(build.kind.displayName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(build.wineURL.path(percentEncoded: false))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             Spacer()
+            InfoButton(details: [build.kind.displayName, build.wineURL.path(percentEncoded: false)])
             if build.isActive {
                 Text("Global default")
                     .foregroundStyle(.secondary)
@@ -251,17 +245,17 @@ struct WineManagerView: View {
                 HStack(spacing: 6) {
                     if installed?.isActive == true {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.tint)
+                            .foregroundStyle(.green)
                     }
                     Text(release.displayName)
                         .fontWeight(installed?.isActive == true ? .semibold : .regular)
                 }
-                Text("\(release.assetName) - \(formatBytes(release.size))")
+                Text(formatBytes(release.size))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             Spacer()
+            InfoButton(details: [release.assetName, formatBytes(release.size), release.downloadURL.absoluteString])
             if operationID == release.id {
                 ProgressView()
                     .controlSize(.small)

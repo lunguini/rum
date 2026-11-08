@@ -20,7 +20,7 @@ import SwiftUI
 import RumKit
 
 /// Home: what's running (or starting), what gets played most, and what was played last.
-struct LibraryHomePage<RunControls: View>: View {
+struct LibraryHomePage: View {
     let running: [LibraryPinItem]
     let favourites: [LibraryPinItem]
     let recent: [LibraryPinItem]
@@ -29,8 +29,6 @@ struct LibraryHomePage<RunControls: View>: View {
     let actions: LibraryItemActions
     let onSelect: (LibraryPinItem) -> Void
     let onSeeAllRecent: () -> Void
-    /// Run Windows App… and friends, at the end of the Running header like on the other pages.
-    @ViewBuilder let runControls: () -> RunControls
 
     private static var spacing: CGFloat { 16 }
     /// Cards in the rows have a fixed size, so the rows never widen the page.
@@ -46,14 +44,25 @@ struct LibraryHomePage<RunControls: View>: View {
                 if !recent.isEmpty {
                     shelf("Recently Played", items: recent, onSeeAll: onSeeAllRecent)
                 }
-                if running.isEmpty && favourites.isEmpty && recent.isEmpty {
-                    ContentUnavailableView("Nothing Played Yet", systemImage: "gamecontroller",
-                                           description: Text("Games and apps you run show up here."))
-                        .padding(.top, 40)
-                }
             }
             .padding(EdgeInsets(top: 10, leading: LibrarySidebarMetrics.margin,
                                 bottom: LibrarySidebarMetrics.margin, trailing: LibrarySidebarMetrics.margin))
+        }
+        // Centred in the whole page, not just below the Running header, at any window size.
+        .overlay {
+            if running.isEmpty && favourites.isEmpty && recent.isEmpty {
+                ContentUnavailableView {
+                    Label {
+                        Text("Nothing Played Yet")
+                    } icon: {
+                        Image("RumLogo") // 96pt, pre-rendered per screen scale
+                            .renderingMode(.original)
+                    }
+                } description: {
+                    Text("Games and apps you run show up here.")
+                }
+                .allowsHitTesting(false)
+            }
         }
     }
 
@@ -78,7 +87,6 @@ struct LibraryHomePage<RunControls: View>: View {
                         .padding(.leading, 4)
                 }
                 Spacer()
-                runControls()
             }
             if !running.isEmpty {
                 row(running)

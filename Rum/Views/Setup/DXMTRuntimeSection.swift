@@ -67,10 +67,9 @@ struct DXMTRuntimeSection: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("Graphics runtimes")
-        } footer: {
-            Text(
-                "DXMT is a separate renderer payload. It works only with Wine engines "
+            InfoHeader(
+                "Graphics runtimes",
+                note: "DXMT is a separate renderer payload. It works only with Wine engines "
                     + "that expose the required macOS driver API."
             )
         }
@@ -125,4 +124,59 @@ func formatBytes(_ bytes: Int) -> String {
     let formatter = ByteCountFormatter()
     formatter.countStyle = .file
     return formatter.string(fromByteCount: Int64(bytes))
+}
+
+/// An ⓘ that shows a row's full details (paths, file names) on hover, and in a popover on click,
+/// where they can be read in full and selected.
+struct InfoButton: View {
+    let details: [String]
+    /// Paths and file names read best in a fixed-width font; prose doesn't.
+    var monospaced = true
+    @State private var isShown = false
+
+    var body: some View {
+        Button {
+            isShown.toggle()
+        } label: {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.borderless)
+        .help(details.joined(separator: "\n"))
+        .popover(isPresented: $isShown, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(details, id: \.self) { detail in
+                    Text(detail)
+                        .font(monospaced ? .callout.monospaced() : .callout)
+                        // Section headers limit their text to one line, and the popover inherits it.
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .textSelection(.enabled)
+            .padding(12)
+            .frame(width: 360, alignment: .leading)
+        }
+    }
+}
+
+/// A section title with an ⓘ beside it holding the section's explanation, instead of a footer
+/// that the list squeezes onto one cut-off line.
+struct InfoHeader: View {
+    let title: LocalizedStringKey
+    let note: String
+
+    init(_ title: LocalizedStringKey, note: String) {
+        self.title = title
+        self.note = note
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(title)
+            InfoButton(details: [note], monospaced: false)
+                .font(.caption)
+        }
+        .help(note)
+    }
 }

@@ -96,12 +96,12 @@ struct RumApp: App {
             }
             CommandGroup(replacing: .help) {
                 Button("help.website") {
-                    if let url = URL(string: "https://github.com/adrianlungu/rum") {
+                    if let url = URL(string: "https://github.com/lunguini/rum") {
                         openURL(url)
                     }
                 }
                 Button("help.github") {
-                    if let url = URL(string: "https://github.com/adrianlungu/rum") {
+                    if let url = URL(string: "https://github.com/lunguini/rum") {
                         openURL(url)
                     }
                 }

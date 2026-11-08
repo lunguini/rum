@@ -36,78 +36,78 @@ struct LibrarySidebar: View {
     let recentCount: Int
     let foundCount: Int
     let runningCount: Int
-    let window: NSWindow?
 
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        List(selection: $page) {
-            Section {
-                row("Home", icon: "house", count: runningCount)
-                    .tag(LibraryPage.home)
-                row("Games & Apps", icon: "square.grid.2x2", count: libraryCount)
-                    .tag(LibraryPage.library)
-                row("Recently Played", icon: "clock", count: recentCount)
-                    .tag(LibraryPage.recent)
-                if foundCount > 0 {
-                    row("Found in Bottles", icon: "sparkle.magnifyingglass", count: foundCount)
-                        .tag(LibraryPage.found)
-                }
-            }
-        }
-        .listStyle(.sidebar)
-        .contentMargins(.top, 8, for: .scrollContent)
-        .scrollContentBackground(.hidden)
-        .environment(\.sidebarRowSize, .large)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
-                HStack {
-                    WindowControls(window: window)
-                    Spacer(minLength: 0)
-                }
-                .padding(.leading, LibrarySidebarMetrics.margin)
+        VStack(spacing: 0) {
+            // Room for the system's traffic lights, which stay where macOS puts them.
+            WindowDragArea()
                 .frame(height: LibrarySidebarMetrics.topBarHeight)
-                .background(WindowDragArea())
-                logo
+            logo
+            ScrollView {
+                VStack(alignment: isCompact ? .center : .leading, spacing: 2) {
+                    pageButton("Home", icon: "house", page: .home, count: runningCount)
+                    pageButton("Games & Apps", icon: "square.grid.2x2", page: .library, count: libraryCount)
+                    pageButton("Recently Played", icon: "clock", page: .recent, count: recentCount)
+                    if foundCount > 0 {
+                        pageButton("Found in Bottles", icon: "sparkle.magnifyingglass", page: .found,
+                                   count: foundCount)
+                    }
+                }
+                .padding(.horizontal, 10)
             }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+            .scrollIndicators(.never)
             footer
         }
+        .background(LibrarySidebarTint().ignoresSafeArea())
         .background(VisualEffectBackground(material: .sidebar).ignoresSafeArea())
     }
 
+    /// The logo with the name beside it, like a native app's sidebar header. Collapsed, the
+    /// sidebar is too narrow for the name, so it shows the logo alone.
     private var logo: some View {
-        let size: CGFloat = isCompact ? 44 : 72
-        return Image(nsImage: NSApp.applicationIconImage)
-            .resizable()
-            .interpolation(.high)
-            .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
-            .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
-            .frame(maxWidth: .infinity)
-            .padding(.bottom, 4)
-            .accessibilityHidden(true)
+        HStack(spacing: 8) {
+            // Pre-rendered at exactly these sizes for each screen scale, so it is never resampled.
+            Image(isCompact ? "RumLogoCompact" : "RumLogoSidebar")
+                .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
+            if !isCompact {
+                Text(verbatim: "Rum")
+                    .font(.title.weight(.bold))
+                    .fontDesign(.rounded)
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, isCompact ? 0 : LibrarySidebarMetrics.margin)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+        .padding(.bottom, 16)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Rum")
     }
 
-    @ViewBuilder
-    private func row(_ title: LocalizedStringKey, icon: String, count: Int) -> some View {
-        if isCompact {
-            Image(systemName: icon)
-                .font(.title3)
-                .frame(maxWidth: .infinity, minHeight: 28)
-                .help(title)
-                .accessibilityLabel(title)
-        } else {
-            Label(title, systemImage: icon)
-                .badge(count)
+    private func pageButton(_ title: LocalizedStringKey, icon: String, page target: LibraryPage,
+                            count: Int) -> some View {
+        Button {
+            page = target
+        } label: {
+            HStack(spacing: 0) {
+                footerLabel(title, icon: icon)
+                if !isCompact && count > 0 {
+                    Text("\(count)")
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
+        .buttonStyle(LibrarySidebarFooterButtonStyle(isSelected: page == target))
+        .help(isCompact ? Text(title) : Text(verbatim: ""))
     }
 
     private var footer: some View {
         VStack(alignment: isCompact ? .center : .leading, spacing: 4) {
             Button {
-                if let url = URL(string: "https://github.com/adrianlungu/rum") {
+                if let url = URL(string: "https://github.com/lunguini/rum") {
                     openURL(url)
                 }
             } label: {
@@ -166,6 +166,26 @@ struct LibrarySidebar: View {
     }
 }
 
+/// The logo's colours washed over the sidebar's vibrant material: amber at the top, through pink,
+/// to violet at the bottom. Kept faint so text and the system material still read as native.
+private struct LibrarySidebarTint: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let strength = colorScheme == .dark ? 1.0 : 0.6
+        LinearGradient(
+            stops: [
+                .init(color: Color(red: 1.0, green: 0.66, blue: 0.16).opacity(0.22 * strength), location: 0),
+                .init(color: Color(red: 0.98, green: 0.30, blue: 0.45).opacity(0.12 * strength), location: 0.5),
+                .init(color: Color(red: 0.45, green: 0.20, blue: 1.0).opacity(0.20 * strength), location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .allowsHitTesting(false)
+    }
+}
+
 /// Plain sidebar-style button that highlights on hover, and stays highlighted while its page is open.
 private struct LibrarySidebarFooterButtonStyle: ButtonStyle {
     let isSelected: Bool
@@ -179,7 +199,9 @@ private struct LibrarySidebarFooterButtonStyle: ButtonStyle {
             .padding(.horizontal, 8)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(.primary.opacity(fillOpacity(isPressed: configuration.isPressed)))
+                    .fill(isSelected
+                          ? AnyShapeStyle(Color.rum.opacity(configuration.isPressed ? 0.34 : 0.24))
+                          : AnyShapeStyle(.primary.opacity(fillOpacity(isPressed: configuration.isPressed))))
             )
             .onHover { isHovering = $0 }
     }
@@ -212,7 +234,7 @@ final class LibraryNavigator: ObservableObject {
 
 /// The bar at the top of each Library page: sidebar toggle and title on the left, search and the
 /// details toggle on the right. Part of the page, so it follows both side panels on its own.
-struct LibraryTitleBar: View {
+struct LibraryTitleBar<Accessory: View>: View {
     let title: LocalizedStringKey
     @Binding var searchText: String
     let showsSearch: Bool
@@ -221,6 +243,8 @@ struct LibraryTitleBar: View {
     let isDetailsShown: Bool
     let onToggleSidebar: () -> Void
     let onToggleDetails: () -> Void
+    /// Page actions such as Run Windows App…, just before the search field.
+    @ViewBuilder let accessory: () -> Accessory
 
     var body: some View {
         HStack(spacing: 10) {
@@ -233,6 +257,9 @@ struct LibraryTitleBar: View {
                 .font(.title3.weight(.semibold))
                 .lineLimit(1)
             Spacer(minLength: 12)
+            accessory()
+                .buttonStyle(.automatic)
+                .labelStyle(.titleAndIcon)
             if showsSearch {
                 LibrarySearchField(text: $searchText)
             }

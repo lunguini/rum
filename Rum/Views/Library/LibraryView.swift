@@ -52,7 +52,6 @@ struct LibraryView: View {
 
     @State var page: LibraryPage? = .home
     @State var settingsProgram: Program?
-    @State private var window: NSWindow?
     /// The bottle whose own settings are open on the Settings page, if any.
     @State private var managedBottleURL: URL?
     @State var selection: LibraryPinItem.ID?
@@ -135,8 +134,7 @@ struct LibraryView: View {
                            libraryCount: pinnedItems.count,
                            recentCount: recentEntries.count,
                            foundCount: visibleSuggestions.count,
-                           runningCount: runningItems.count,
-                           window: window)
+                           runningCount: runningItems.count)
             .frame(width: sidebarWidth)
             Divider()
                 .ignoresSafeArea()
@@ -149,7 +147,8 @@ struct LibraryView: View {
                                 showsDetailsToggle: showsDetails,
                                 isDetailsShown: showsInspector,
                                 onToggleSidebar: toggleSidebar,
-                                onToggleDetails: { withAnimation { showsInspector.toggle() } })
+                                onToggleDetails: { withAnimation { showsInspector.toggle() } },
+                                accessory: { if currentPage != .settings { runControls } })
                 pageContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -169,9 +168,8 @@ struct LibraryView: View {
                     .inspectorColumnWidth(min: 280, ideal: 320, max: 420)
             }
         }
-        // The top of the window is the Library's: no system title bar (see HiddenSystemTitleBar).
+        // Content runs under the (hidden) title bar; the system keeps its traffic lights there.
         .ignoresSafeArea(.container, edges: .top)
-        .background(HiddenSystemTitleBar(window: $window))
         // On the container rather than in withAnimation: changes to @AppStorage values don't
         // reliably pick up the transaction.
         .animation(.smooth(duration: 0.28), value: isSidebarCompact)
@@ -245,9 +243,6 @@ struct LibraryView: View {
                         LibraryAddCard(action: chooseAndAdd)
                     }
                 }
-                if items.isEmpty && !searchText.isEmpty {
-                    noMatches
-                }
             }
             .padding(EdgeInsets(top: 10, leading: LibrarySidebarMetrics.margin,
                                 bottom: LibrarySidebarMetrics.margin, trailing: LibrarySidebarMetrics.margin))
@@ -260,15 +255,11 @@ struct LibraryView: View {
             }
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color.rum, lineWidth: 2)
-                .padding(4)
-                .opacity(isDropTargeted ? 1 : 0)
-                .allowsHitTesting(false)
+            if items.isEmpty && !searchText.isEmpty {
+                noMatches
+            }
         }
-        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
-            handleDrop(providers: providers)
-        }
+        .acceptsProgramDrops(isTargeted: $isDropTargeted, perform: handleDrop)
     }
 
 }
@@ -276,30 +267,38 @@ struct LibraryView: View {
 // MARK: - Secondary pages & shared pieces
 
 extension LibraryView {
+    @ViewBuilder
     private var recentPage: some View {
         let entries = filteredRecentEntries
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                pageHeader(count: entries.count) { EmptyView() }
-                if entries.isEmpty {
+        if entries.isEmpty {
+            VStack(spacing: 0) {
+                pageHeader(count: 0) { EmptyView() }
+                    .padding(EdgeInsets(top: 10, leading: LibrarySidebarMetrics.margin,
+                                        bottom: 0, trailing: LibrarySidebarMetrics.margin))
+                Group {
                     if searchText.isEmpty {
                         ContentUnavailableView("Nothing Played Yet", systemImage: "clock",
                                                description: Text("Programs you run show up here."))
-                            .padding(.top, 40)
                     } else {
                         noMatches
                     }
-                } else {
-                    groupedRows(entries) { item in
-                        LibraryRecentRow(bottle: item.bottle,
-                                         entry: item.entry,
-                                         showsBottle: showsBottleNames,
-                                         onRun: { run(item.entry.url, in: item.bottle) })
-                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        } else {
+            ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                pageHeader(count: entries.count) { EmptyView() }
+                groupedRows(entries) { item in
+                    LibraryRecentRow(bottle: item.bottle,
+                                     entry: item.entry,
+                                     showsBottle: showsBottleNames,
+                                     onRun: { run(item.entry.url, in: item.bottle) })
                 }
             }
             .padding(EdgeInsets(top: 10, leading: LibrarySidebarMetrics.margin,
                                 bottom: LibrarySidebarMetrics.margin, trailing: LibrarySidebarMetrics.margin))
+            }
         }
     }
 
@@ -314,8 +313,8 @@ extension LibraryView {
                             selection = item.id
                             showsInspector = true
                         },
-                        onSeeAllRecent: { page = .recent },
-                        runControls: { runControls })
+                        onSeeAllRecent: { page = .recent })
+        .acceptsProgramDrops(isTargeted: $isDropTargeted, perform: handleDrop)
     }
 
     private var foundPage: some View {
@@ -343,7 +342,6 @@ extension LibraryView {
                 .foregroundStyle(.secondary)
             Spacer()
             controls()
-            runControls
         }
     }
 
@@ -354,9 +352,9 @@ extension LibraryView {
                 bottleMenu
             }
             Button(action: chooseAndRun) {
-                Label("Run Windows App…", systemImage: "plus")
+                Label("Run", systemImage: "play.fill")
             }
-            .buttonStyle(RumProminentButtonStyle())
+            .buttonStyle(RumTitleBarButtonStyle())
             .keyboardShortcut("o", modifiers: .command)
             .disabled(defaultBottle == nil)
             .help("Run a game, app or installer from anywhere on your Mac (⌘O)")

@@ -52,7 +52,7 @@ brew install --cask lunguini/tap/rum
 
 ### Manual
 
-Download the latest `Rum.zip` from the [Releases](https://github.com/adrianlungu/rum/releases) page, extract it, and move `Rum.app` to your Applications folder.
+Download the latest `Rum.zip` from the [Releases](https://github.com/lunguini/rum/releases) page, extract it, and move `Rum.app` to your Applications folder.
 
 > **Note:** Since the app is not notarized, macOS will block it on first launch. Right-click the app → **Open**, then click **Open** in the dialog. You only need to do this once.
 

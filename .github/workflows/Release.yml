@@ -55,7 +55,10 @@ jobs:
         with:
           files: ${{ runner.temp }}/export/Rum.zip
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          # Betas are the main download, so only alphas are marked as pre-releases.
+          prerelease: ${{ contains(github.ref_name, '-alpha') }}
+          # v1 maintenance releases must never become the repository's "latest" release.
+          make_latest: ${{ !startsWith(github.ref_name, 'v1.') && !contains(github.ref_name, '-alpha') }}
 
       - name: Update Homebrew Casks
         env:
@@ -65,13 +68,17 @@ jobs:
           MAJOR="${VERSION%%.*}"
           SHA256=$(shasum -a 256 ${{ runner.temp }}/export/Rum.zip | awk '{print $1}')
 
-          # "rum" tracks stable releases only; "rum@2" tracks the newest v2 build, including pre-releases
+          # "rum" is the current line (v2+), pre-releases included, so `brew install rum` gets the
+          # beta. "rum@1" keeps the v1 line for anyone who needs it. "rum@2" is kept up to date for
+          # people who installed the v2 alpha under that name.
           CASKS=()
-          if [[ "$VERSION" != *-* ]]; then
+          if [[ "$MAJOR" == "1" ]]; then
+            CASKS+=("rum@1")
+          else
             CASKS+=("rum")
-          fi
-          if [[ "$MAJOR" == "2" ]]; then
-            CASKS+=("rum@2")
+            if [[ "$MAJOR" == "2" ]]; then
+              CASKS+=("rum@2")
+            fi
           fi
 
           for CASK in "${CASKS[@]}"; do
@@ -79,8 +86,8 @@ jobs:
           import sys, json, base64, urllib.request
 
           version, sha256, token, cask_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-          other_cask = "rum@2" if cask_name == "rum" else "rum"
-          display_name = "Rum" if cask_name == "rum" else "Rum (v2)"
+          other_casks = [name for name in ("rum", "rum@1", "rum@2") if name != cask_name]
+          display_name = {"rum": "Rum", "rum@1": "Rum (v1)", "rum@2": "Rum (v2)"}[cask_name]
           repo = "lunguini/homebrew-tap"
           path = f"Casks/{cask_name}.rb"
           api = f"https://api.github.com/repos/{repo}/contents/{path}"
@@ -90,12 +97,12 @@ jobs:
           \tversion "{version}"
           \tsha256 "{sha256}"
 
-          \turl "https://github.com/adrianlungu/rum/releases/download/v#{{version}}/Rum.zip"
+          \turl "https://github.com/lunguini/rum/releases/download/v#{{version}}/Rum.zip"
           \tname "{display_name}"
           \tdesc "Wine wrapper for running Windows apps on macOS"
-          \thomepage "https://github.com/adrianlungu/rum"
+          \thomepage "https://github.com/lunguini/rum"
 
-          \tconflicts_with cask: "{other_cask}"
+          \tconflicts_with cask: {json.dumps(other_casks)}
           \tdepends_on macos: ">= :sequoia"
           \tdepends_on arch: :arm64
 

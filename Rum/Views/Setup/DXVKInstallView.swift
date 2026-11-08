@@ -65,6 +65,6 @@ struct DXVKInstallView: View {
 
     @MainActor
     func proceed() {
-        showSetup = false
+        path.removeAll()
     }
 }
