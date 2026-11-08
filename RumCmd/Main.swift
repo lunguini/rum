@@ -1,30 +1,30 @@
 //
 //  Main.swift
-//  WhiskyCmd
+//  RumCmd
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import Foundation
-import WhiskyKit
+import RumKit
 import SwiftyTextTable
 import Progress
 import SemanticVersion
 import ArgumentParser
 
 @main
-struct Whisky: ParsableCommand {
+struct Rum: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "A CLI interface for Rum.",
         subcommands: [List.self,
@@ -39,7 +39,7 @@ struct Whisky: ParsableCommand {
                       Uninstall.self*/])
 }
 
-extension Whisky {
+extension Rum {
     struct List: ParsableCommand {
         static let configuration = CommandConfiguration(abstract: "List existing bottles.")
 
@@ -209,7 +209,7 @@ extension Whisky {
     struct Uninstall: ParsableCommand {
         static let configuration = CommandConfiguration(abstract: "Uninstall Wine.")
 
-        @Flag(name: [.long, .short], help: "Uninstall Wine") var whiskyWine = false
+        @Flag(name: [.long, .short], help: "Uninstall Wine") var rumWine = false
 
         mutating func run() throws {
 

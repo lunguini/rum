@@ -27,14 +27,15 @@ jobs:
       - name: Build
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          APP_VERSION="${VERSION%%-*}"
           xcodebuild archive \
-            -scheme Whisky \
+            -scheme Rum \
             -archivePath ${{ runner.temp }}/Rum.xcarchive \
             -configuration Release \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            MARKETING_VERSION="$VERSION"
+            MARKETING_VERSION="$APP_VERSION"
 
       - name: Export and Sign
         run: |
@@ -54,32 +55,54 @@ jobs:
         with:
           files: ${{ runner.temp }}/export/Rum.zip
           generate_release_notes: true
+          # Betas are the main download, so only alphas are marked as pre-releases.
+          prerelease: ${{ contains(github.ref_name, '-alpha') }}
+          # v1 maintenance releases must never become the repository's "latest" release.
+          make_latest: ${{ !startsWith(github.ref_name, 'v1.') && !contains(github.ref_name, '-alpha') }}
 
-      - name: Update Homebrew Cask
+      - name: Update Homebrew Casks
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          MAJOR="${VERSION%%.*}"
           SHA256=$(shasum -a 256 ${{ runner.temp }}/export/Rum.zip | awk '{print $1}')
 
-          python3 - "$VERSION" "$SHA256" "$HOMEBREW_TAP_TOKEN" <<'SCRIPT'
+          # "rum" is the current line (v2+), pre-releases included, so `brew install rum` gets the
+          # beta. "rum@1" keeps the v1 line for anyone who needs it. "rum@2" is kept up to date for
+          # people who installed the v2 alpha under that name.
+          CASKS=()
+          if [[ "$MAJOR" == "1" ]]; then
+            CASKS+=("rum@1")
+          else
+            CASKS+=("rum")
+            if [[ "$MAJOR" == "2" ]]; then
+              CASKS+=("rum@2")
+            fi
+          fi
+
+          for CASK in "${CASKS[@]}"; do
+          python3 - "$VERSION" "$SHA256" "$HOMEBREW_TAP_TOKEN" "$CASK" <<'SCRIPT'
           import sys, json, base64, urllib.request
 
-          version, sha256, token = sys.argv[1], sys.argv[2], sys.argv[3]
+          version, sha256, token, cask_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+          other_casks = [name for name in ("rum", "rum@1", "rum@2") if name != cask_name]
+          display_name = {"rum": "Rum", "rum@1": "Rum (v1)", "rum@2": "Rum (v2)"}[cask_name]
           repo = "lunguini/homebrew-tap"
-          path = "Casks/rum.rb"
+          path = f"Casks/{cask_name}.rb"
           api = f"https://api.github.com/repos/{repo}/contents/{path}"
           headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
 
-          cask = f'''cask "rum" do
+          cask = f'''cask "{cask_name}" do
           \tversion "{version}"
           \tsha256 "{sha256}"
 
-          \turl "https://github.com/adrianlungu/rum/releases/download/v#{{version}}/Rum.zip"
-          \tname "Rum"
+          \turl "https://github.com/lunguini/rum/releases/download/v#{{version}}/Rum.zip"
+          \tname "{display_name}"
           \tdesc "Wine wrapper for running Windows apps on macOS"
-          \thomepage "https://github.com/adrianlungu/rum"
+          \thomepage "https://github.com/lunguini/rum"
 
+          \tconflicts_with cask: {json.dumps(other_casks)}
           \tdepends_on macos: ">= :sequoia"
           \tdepends_on arch: :arm64
 
@@ -110,11 +133,12 @@ jobs:
 
           # Push updated cask (omit sha to create, include to update)
           content = base64.b64encode(cask.encode()).decode()
-          body = {"message": f"Update rum to {version}", "content": content}
+          body = {"message": f"Update {cask_name} to {version}", "content": content}
           if file_sha:
               body["sha"] = file_sha
           payload = json.dumps(body).encode()
           req = urllib.request.Request(api, data=payload, headers=headers, method="PUT")
           with urllib.request.urlopen(req) as resp:
-              print(f"Updated cask to {version}: {resp.status}")
+              print(f"Updated {cask_name} cask to {version}: {resp.status}")
           SCRIPT
+          done

@@ -1,23 +1,23 @@
 //
 //  ProgramsView.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 
 struct ProgramsView: View {
     @ObservedObject var bottle: Bottle
@@ -75,7 +75,7 @@ struct ProgramsView: View {
                     }
                 }
             }
-            .animation(.whiskyDefault, value: sortedPrograms)
+            .animation(.rumDefault, value: sortedPrograms)
 
             Section("program.blocklist", isExpanded: $isBlocklistExpanded) {
                 List(searchedBlocklists, id: \.self, selection: $selectedBlockitems) { blockedUrl in
@@ -103,11 +103,11 @@ struct ProgramsView: View {
             }
         }
         .formStyle(.grouped)
-        .animation(.whiskyDefault, value: sortedPrograms)
-        .animation(.whiskyDefault, value: bottle.settings.blocklist)
-        .animation(.whiskyDefault, value: searchText)
-        .animation(.whiskyDefault, value: areProgramsExpanded)
-        .animation(.whiskyDefault, value: isBlocklistExpanded)
+        .animation(.rumDefault, value: sortedPrograms)
+        .animation(.rumDefault, value: bottle.settings.blocklist)
+        .animation(.rumDefault, value: searchText)
+        .animation(.rumDefault, value: areProgramsExpanded)
+        .animation(.rumDefault, value: isBlocklistExpanded)
         .navigationTitle("tab.programs")
         .searchable(text: $searchText)
         .onAppear {

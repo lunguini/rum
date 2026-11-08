@@ -1,24 +1,24 @@
 //
 //  Winetricks.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import Foundation
 import AppKit
-import WhiskyKit
+import RumKit
 
 enum WinetricksCategories: String {
     case apps
@@ -42,9 +42,9 @@ struct WinetricksCategory {
 }
 
 class Winetricks {
-    static let winetricksURL: URL = WhiskyWineInstaller.libraryFolder
+    static let winetricksURL: URL = RumWineInstaller.libraryFolder
         .appending(path: "winetricks")
-    static let verbsURL: URL = WhiskyWineInstaller.libraryFolder
+    static let verbsURL: URL = RumWineInstaller.libraryFolder
         .appending(path: "verbs.txt")
 
     /// Official self-contained winetricks script.
@@ -59,7 +59,7 @@ class Winetricks {
     @discardableResult
     static func ensureInstalled() async -> Bool {
         let fileManager = FileManager.default
-        let libraryFolder = WhiskyWineInstaller.libraryFolder
+        let libraryFolder = RumWineInstaller.libraryFolder
 
         if !fileManager.fileExists(atPath: winetricksURL.path(percentEncoded: false)) {
             guard let winetricksDownloadURL else { return false }
@@ -91,9 +91,9 @@ class Winetricks {
     private static func generateVerbs() async {
         guard let resourcesURL = Bundle.main.url(forResource: "cabextract", withExtension: nil)?
             .deletingLastPathComponent() else { return }
-        WhiskyWineInstaller.linkSikarugirSupportLibraries()
+        RumWineInstaller.linkSikarugirSupportLibraries()
 
-        let binPath = WhiskyWineInstaller.binFolder.path
+        let binPath = RumWineInstaller.binFolder.path
         let resPath = resourcesURL.path(percentEncoded: false)
         let wineName = Wine.wineBinary.lastPathComponent
         let tricks = winetricksURL.path(percentEncoded: false)
@@ -124,7 +124,7 @@ class Winetricks {
         // Winetricks runs under /bin/sh, which SIP strips DYLD_* from, so the engine has to be able
         // to find its @rpath libraries on its own. Cheap and idempotent; also repairs engines that
         // were installed before this linking existed.
-        WhiskyWineInstaller.linkSikarugirSupportLibraries()
+        RumWineInstaller.linkSikarugirSupportLibraries()
 
         let wineBinary = Wine.wineBinary(for: bottle)
         let binPath = wineBinary.deletingLastPathComponent().path
@@ -134,7 +134,7 @@ class Winetricks {
         var wineEnvironment: [String: String] = [:]
         bottle.settings.environmentVariables(wineEnv: &wineEnvironment)
         wineEnvironment.merge(
-            WhiskyWineInstaller.graphicsEnvironment(
+            RumWineInstaller.graphicsEnvironment(
                 for: bottle.settings.graphicsBackend,
                 engineID: bottle.settings.wineEngineID
             ),

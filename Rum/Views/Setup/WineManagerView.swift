@@ -1,23 +1,23 @@
 //
 //  WineManagerView.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 
 // The manager keeps discovery, activation, and download rows together so their operation-state
 // handling stays consistent.
@@ -79,8 +79,8 @@ struct WineManagerView: View {
                             )
                                 .foregroundStyle(.secondary)
                         }
-                    } footer: {
-                        Text(externalEngineLicenseNote)
+                    } header: {
+                        InfoHeader("Import", note: externalEngineLicenseNote)
                     }
                     DXMTRuntimeSection()
                     if !externalEngines.isEmpty {
@@ -112,10 +112,9 @@ struct WineManagerView: View {
                             }
                         }
                     } header: {
-                        Text("Available Sikarugir Downloads")
-                    } footer: {
-                        Text(
-                            "Sikarugir engines are third-party Wine builds. "
+                        InfoHeader(
+                            "Available Sikarugir Downloads",
+                            note: "Sikarugir engines are third-party Wine builds. "
                                 + "Review their licenses and compatibility before use. "
                                 + "The first install also fetches the official template support files."
                         )
@@ -129,6 +128,7 @@ struct WineManagerView: View {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.red)
                         .lineLimit(2)
+                        .help(errorMessage)
                 }
                 Spacer()
                 Button("Close") {
@@ -172,17 +172,14 @@ struct WineManagerView: View {
                 HStack(spacing: 6) {
                     if isActive {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.tint)
+                            .foregroundStyle(.green)
                     }
                     Text(engine.displayName)
                         .fontWeight(isActive ? .semibold : .regular)
                 }
-                Text(engine.appURL.path(percentEncoded: false))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             Spacer()
+            InfoButton(details: [engine.appURL.path(percentEncoded: false)])
             if !engine.isAvailable {
                 Text("Missing")
                     .foregroundStyle(.red)
@@ -195,7 +192,7 @@ struct WineManagerView: View {
             } else {
                 Button("Activate") {
                     run(version: engine.id) {
-                        try WhiskyWineInstaller.activateExternalWineEngine(engine.id)
+                        try RumWineInstaller.activateExternalWineEngine(engine.id)
                     }
                 }
             }
@@ -209,7 +206,7 @@ struct WineManagerView: View {
                 HStack(spacing: 6) {
                     if build.isActive {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.tint)
+                            .foregroundStyle(.green)
                     }
                     Text(build.displayName)
                         .fontWeight(build.isActive ? .semibold : .regular)
@@ -217,24 +214,21 @@ struct WineManagerView: View {
                 Text(build.kind.displayName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(build.wineURL.path(percentEncoded: false))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             Spacer()
+            InfoButton(details: [build.kind.displayName, build.wineURL.path(percentEncoded: false)])
             if build.isActive {
                 Text("Global default")
                     .foregroundStyle(.secondary)
             } else {
                 Button("Activate") {
                     run(version: build.id) {
-                        try WhiskyWineInstaller.activateWineEngine(build.id)
+                        try RumWineInstaller.activateWineEngine(build.id)
                     }
                 }
                 Button("Remove") {
                     run(version: build.id) {
-                        try WhiskyWineInstaller.removeWineEngine(build.id)
+                        try RumWineInstaller.removeWineEngine(build.id)
                     }
                 }
             }
@@ -251,17 +245,17 @@ struct WineManagerView: View {
                 HStack(spacing: 6) {
                     if installed?.isActive == true {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.tint)
+                            .foregroundStyle(.green)
                     }
                     Text(release.displayName)
                         .fontWeight(installed?.isActive == true ? .semibold : .regular)
                 }
-                Text("\(release.assetName) - \(formatBytes(release.size))")
+                Text(formatBytes(release.size))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             Spacer()
+            InfoButton(details: [release.assetName, formatBytes(release.size), release.downloadURL.absoluteString])
             if operationID == release.id {
                 ProgressView()
                     .controlSize(.small)
@@ -271,7 +265,7 @@ struct WineManagerView: View {
             } else if installed != nil {
                 Button("Activate") {
                     run(version: installed?.id ?? release.id) {
-                        try WhiskyWineInstaller.activateWineEngine(installed?.id ?? release.id)
+                        try RumWineInstaller.activateWineEngine(installed?.id ?? release.id)
                     }
                 }
             } else {
@@ -288,18 +282,18 @@ struct WineManagerView: View {
         loading = true
         errorMessage = nil
         do {
-            try WhiskyWineInstaller.migrateLegacyWineIfNeeded()
+            try RumWineInstaller.migrateLegacyWineIfNeeded()
         } catch {
             errorMessage = error.localizedDescription
         }
-        installedBuilds = WhiskyWineInstaller.installedWineBuilds()
-        externalEngines = WhiskyWineInstaller.externalWineEngines()
-        detectedCrossOver = WhiskyWineInstaller.defaultCrossOverEngine()
-        detectedGamePortingToolkit = WhiskyWineInstaller.defaultGamePortingToolkitEngine()
-        activeExternalEngineID = WhiskyWineInstaller.activeExternalWineEngine()?.id
-        activeVersion = WhiskyWineInstaller.activeWineVersion() ?? WhiskyWineInstaller.installedWineVersion()
-        async let gcenxReleases = WhiskyWineInstaller.fetchAvailableWineReleases()
-        async let sikarugirReleases = WhiskyWineInstaller.fetchAvailableSikarugirReleases()
+        installedBuilds = RumWineInstaller.installedWineBuilds()
+        externalEngines = RumWineInstaller.externalWineEngines()
+        detectedCrossOver = RumWineInstaller.defaultCrossOverEngine()
+        detectedGamePortingToolkit = RumWineInstaller.defaultGamePortingToolkitEngine()
+        activeExternalEngineID = RumWineInstaller.activeExternalWineEngine()?.id
+        activeVersion = RumWineInstaller.activeWineVersion() ?? RumWineInstaller.installedWineVersion()
+        async let gcenxReleases = RumWineInstaller.fetchAvailableWineReleases()
+        async let sikarugirReleases = RumWineInstaller.fetchAvailableSikarugirReleases()
         releases = await gcenxReleases
         self.sikarugirReleases = await sikarugirReleases
         loading = false
@@ -311,7 +305,7 @@ struct WineManagerView: View {
         errorMessage = nil
         Task {
             do {
-                try WhiskyWineInstaller.importCrossOverEngine(at: detectedCrossOver.appURL)
+                try RumWineInstaller.importCrossOverEngine(at: detectedCrossOver.appURL)
                 await load()
             } catch {
                 errorMessage = error.localizedDescription
@@ -340,7 +334,7 @@ struct WineManagerView: View {
         errorMessage = nil
         Task {
             do {
-                try WhiskyWineInstaller.importGamePortingToolkitEngine(at: appURL)
+                try RumWineInstaller.importGamePortingToolkitEngine(at: appURL)
                 await load()
             } catch {
                 errorMessage = error.localizedDescription
@@ -358,13 +352,13 @@ struct WineManagerView: View {
                 // Install without activating — the row's "Activate" button routes through
                 // run(version:), which kills bottles before swapping the active symlink.
                 if release.kind == .sikarugir {
-                    try await WhiskyWineInstaller.installSikarugirEngine(
+                    try await RumWineInstaller.installSikarugirEngine(
                         from: tarball,
                         version: release.version,
                         activate: false
                     )
                 } else {
-                    try await WhiskyWineInstaller.install(
+                    try await RumWineInstaller.install(
                         from: tarball,
                         version: release.version,
                         kind: release.kind,
@@ -384,7 +378,7 @@ struct WineManagerView: View {
         errorMessage = nil
         Task {
             do {
-                await WhiskyApp.killBottlesAndWait()
+                await RumApp.killBottlesAndWait()
                 try action()
                 await load()
             } catch {

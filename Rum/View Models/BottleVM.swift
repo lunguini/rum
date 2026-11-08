@@ -1,24 +1,24 @@
 //
 //  BottleVM.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import Foundation
 import SemanticVersion
-import WhiskyKit
+import RumKit
 
 // swiftlint:disable:next todo
 // TODO: Don't use unchecked!
@@ -33,6 +33,23 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
         bottles = bottlesList.loadBottles()
     }
 
+    /// UserDefaults key of the bottle the Library's Run button uses.
+    static let defaultBottleKey = "libraryDefaultBottleURL"
+
+    /// Bottles that can run programs right now, sorted by name.
+    var availableBottles: [Bottle] {
+        bottles.filter { $0.isAvailable && !$0.inFlight }.sorted()
+    }
+
+    /// The bottle new programs run in: the user's choice if it is still available, otherwise the
+    /// first 64-bit bottle, otherwise any bottle.
+    func defaultBottle(preferredURL: URL?) -> Bottle? {
+        let bottles = availableBottles
+        return bottles.first { $0.url == preferredURL }
+            ?? bottles.first { $0.settings.architecture == .win64 }
+            ?? bottles.first
+    }
+
     func countActive() -> Int {
         return bottles.filter { $0.isAvailable == true }.count
     }
@@ -44,55 +61,89 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
         bottleURL: URL
     ) -> URL {
         let newBottleDir = bottleURL.appending(path: UUID().uuidString)
-
         Task.detached {
-            var bottleId: Bottle?
             do {
-                try FileManager.default.createDirectory(
-                    atPath: newBottleDir.path(percentEncoded: false),
-                    withIntermediateDirectories: true
+                try await self.createBottle(
+                    at: newBottleDir, name: bottleName, winVersion: winVersion, architecture: architecture
                 )
-                let bottle = Bottle(bottleUrl: newBottleDir, inFlight: true)
-                bottleId = bottle
-
-                await MainActor.run {
-                    self.bottles.append(bottle)
-                    if !WhiskyWineInstaller.isDXVKInstalled() {
-                        bottle.settings.graphicsBackend = .wineD3D
-                    }
-                    // Pin new bottles to the engine that created their prefix. Existing bottles
-                    // with a nil ID continue to follow the global default for compatibility.
-                    if let activeEngine = try? WhiskyWineInstaller.wineEngine(for: nil) {
-                        bottle.settings.wineEngineID = activeEngine.id
-                    }
-                    bottle.settings.windowsVersion = winVersion
-                    bottle.settings.architecture = architecture
-                    bottle.settings.name = bottleName
-                }
-
-                try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
-                let wineVer = try await Wine.wineVersion(bottle: bottle)
-
-                await MainActor.run {
-                    bottle.settings.wineVersion = SemanticVersion(wineVer)
-                        ?? SemanticVersion(0, 0, 0)
-                    self.bottlesList.paths.append(newBottleDir)
-                    self.loadBottles()
-                }
             } catch {
                 print("Failed to create new bottle: \(error)")
-                if let bottle = bottleId {
-                    await MainActor.run {
-                        if let index = self.bottles.firstIndex(of: bottle) {
-                            self.bottles.remove(at: index)
-                        }
-                    }
-                }
-                // Best-effort cleanup of the directory created above so a failed creation
-                // doesn't leave an orphaned prefix on disk.
-                try? FileManager.default.removeItem(at: newBottleDir)
             }
         }
         return newBottleDir
+    }
+
+    /// Creates the "Default" 64-bit bottle the Library runs programs in, and makes it the default.
+    /// Used by setup so beginners never have to create a bottle themselves.
+    func createDefaultBottle() async throws -> URL {
+        let location = UserDefaults.standard.url(forKey: "defaultBottleLocation") ?? BottleData.defaultBottleDir
+        let url = location.appending(path: UUID().uuidString)
+        try await createBottle(at: url, name: "Default", winVersion: .win10, architecture: .win64)
+        UserDefaults.standard.set(url, forKey: Self.defaultBottleKey)
+        return url
+    }
+
+    /// The best renderer the engine can use: DXMT, then DXVK, then WineD3D (always available).
+    static func preferredGraphicsBackend(
+        for architecture: BottleArchitecture,
+        engineID: String?
+    ) -> GraphicsBackend {
+        let available = RumWineInstaller.graphicsBackendAvailability(for: architecture, engineID: engineID)
+            .filter(\.isAvailable).map(\.backend)
+        return [GraphicsBackend.dxmt, .dxvk].first(where: available.contains) ?? .wineD3D
+    }
+
+    /// Creates and boots a prefix at `newBottleDir`. Returns once Wine has finished setting it up.
+    func createBottle(
+        at newBottleDir: URL,
+        name bottleName: String,
+        winVersion: WinVersion,
+        architecture: BottleArchitecture
+    ) async throws {
+        var bottleId: Bottle?
+        do {
+            try FileManager.default.createDirectory(
+                atPath: newBottleDir.path(percentEncoded: false),
+                withIntermediateDirectories: true
+            )
+            let bottle = Bottle(bottleUrl: newBottleDir, inFlight: true)
+            bottleId = bottle
+
+            await MainActor.run {
+                self.bottles.append(bottle)
+                // Pin new bottles to the engine that created their prefix. Existing bottles
+                // with a nil ID continue to follow the global default for compatibility.
+                let engineID = (try? RumWineInstaller.wineEngine(for: nil))?.id
+                bottle.settings.wineEngineID = engineID
+                bottle.settings.graphicsBackend = Self.preferredGraphicsBackend(
+                    for: architecture, engineID: engineID
+                )
+                bottle.settings.windowsVersion = winVersion
+                bottle.settings.architecture = architecture
+                bottle.settings.name = bottleName
+            }
+
+            try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
+            let wineVer = try await Wine.wineVersion(bottle: bottle)
+
+            await MainActor.run {
+                bottle.settings.wineVersion = SemanticVersion(wineVer)
+                    ?? SemanticVersion(0, 0, 0)
+                self.bottlesList.paths.append(newBottleDir)
+                self.loadBottles()
+            }
+        } catch {
+            if let bottle = bottleId {
+                await MainActor.run {
+                    if let index = self.bottles.firstIndex(of: bottle) {
+                        self.bottles.remove(at: index)
+                    }
+                }
+            }
+            // Best-effort cleanup of the directory created above so a failed creation
+            // doesn't leave an orphaned prefix on disk.
+            try? FileManager.default.removeItem(at: newBottleDir)
+            throw error
+        }
     }
 }

@@ -1,23 +1,23 @@
 //
 //  DXMTRuntimeSection.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import SwiftUI
-import WhiskyKit
+import RumKit
 
 struct DXMTRuntimeSection: View {
     @State private var release: DXMTRelease?
@@ -67,10 +67,9 @@ struct DXMTRuntimeSection: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("Graphics runtimes")
-        } footer: {
-            Text(
-                "DXMT is a separate renderer payload. It works only with Wine engines "
+            InfoHeader(
+                "Graphics runtimes",
+                note: "DXMT is a separate renderer payload. It works only with Wine engines "
                     + "that expose the required macOS driver API."
             )
         }
@@ -89,8 +88,8 @@ struct DXMTRuntimeSection: View {
 
     @MainActor
     private func load() async {
-        installedVersion = WhiskyWineInstaller.installedDXMTVersion()
-        release = await WhiskyWineInstaller.fetchLatestDXMTRelease()
+        installedVersion = RumWineInstaller.installedDXMTVersion()
+        release = await RumWineInstaller.fetchLatestDXMTRelease()
         loading = false
     }
 
@@ -100,8 +99,8 @@ struct DXMTRuntimeSection: View {
         Task { @MainActor in
             do {
                 let (tarball, _) = try await URLSession.shared.download(from: release.downloadURL)
-                await WhiskyApp.killBottlesAndWait()
-                try await WhiskyWineInstaller.installDXMT(from: tarball, version: release.version)
+                await RumApp.killBottlesAndWait()
+                try await RumWineInstaller.installDXMT(from: tarball, version: release.version)
                 await load()
             } catch {
                 errorMessage = error.localizedDescription
@@ -125,4 +124,59 @@ func formatBytes(_ bytes: Int) -> String {
     let formatter = ByteCountFormatter()
     formatter.countStyle = .file
     return formatter.string(fromByteCount: Int64(bytes))
+}
+
+/// An ⓘ that shows a row's full details (paths, file names) on hover, and in a popover on click,
+/// where they can be read in full and selected.
+struct InfoButton: View {
+    let details: [String]
+    /// Paths and file names read best in a fixed-width font; prose doesn't.
+    var monospaced = true
+    @State private var isShown = false
+
+    var body: some View {
+        Button {
+            isShown.toggle()
+        } label: {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.borderless)
+        .help(details.joined(separator: "\n"))
+        .popover(isPresented: $isShown, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(details, id: \.self) { detail in
+                    Text(detail)
+                        .font(monospaced ? .callout.monospaced() : .callout)
+                        // Section headers limit their text to one line, and the popover inherits it.
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .textSelection(.enabled)
+            .padding(12)
+            .frame(width: 360, alignment: .leading)
+        }
+    }
+}
+
+/// A section title with an ⓘ beside it holding the section's explanation, instead of a footer
+/// that the list squeezes onto one cut-off line.
+struct InfoHeader: View {
+    let title: LocalizedStringKey
+    let note: String
+
+    init(_ title: LocalizedStringKey, note: String) {
+        self.title = title
+        self.note = note
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(title)
+            InfoButton(details: [note], monospaced: false)
+                .font(.caption)
+        }
+        .help(note)
+    }
 }

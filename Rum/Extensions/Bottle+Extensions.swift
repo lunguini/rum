@@ -1,24 +1,24 @@
 //
 //  Bottle+Extensions.swift
-//  Whisky
+//  Rum
 //
-//  This file is part of Whisky.
+//  This file is part of Rum.
 //
-//  Whisky is free software: you can redistribute it and/or modify it under the terms
+//  Rum is free software: you can redistribute it and/or modify it under the terms
 //  of the GNU General Public License as published by the Free Software Foundation,
 //  either version 3 of the License, or (at your option) any later version.
 //
-//  Whisky is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  Rum is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 //  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 //  See the GNU General Public License for more details.
 //
-//  You should have received a copy of the GNU General Public License along with Whisky.
+//  You should have received a copy of the GNU General Public License along with Rum.
 //  If not, see https://www.gnu.org/licenses/.
 //
 
 import Foundation
 import AppKit
-import WhiskyKit
+import RumKit
 import os.log
 
 extension Bottle {
@@ -27,10 +27,10 @@ extension Bottle {
     }
 
     func openTerminal() {
-        let whiskyCmdURL = Bundle.main.url(forResource: "RumCmd", withExtension: nil)
-        if let whiskyCmdURL = whiskyCmdURL {
-            let whiskyCmd = whiskyCmdURL.path(percentEncoded: false)
-            let cmd = "eval \\\"$(\\\"\(whiskyCmd)\\\" shellenv \\\"\(settings.name)\\\")\\\""
+        let rumCmdURL = Bundle.main.url(forResource: "RumCmd", withExtension: nil)
+        if let rumCmdURL = rumCmdURL {
+            let rumCmd = rumCmdURL.path(percentEncoded: false)
+            let cmd = "eval \\\"$(\\\"\(rumCmd)\\\" shellenv \\\"\(settings.name)\\\")\\\""
 
             let script = """
             tell application "Terminal"
@@ -53,46 +53,136 @@ extension Bottle {
         }
     }
 
-    @discardableResult
-    func getStartMenuPrograms() -> [Program] {
-        let globalStartMenu = url
-            .appending(path: "drive_c")
-            .appending(path: "ProgramData")
-            .appending(path: "Microsoft")
-            .appending(path: "Windows")
-            .appending(path: "Start Menu")
+    /// Stop every instance of the program at `url` in this bottle. Asks it to close first (like
+    /// clicking the window's close button), then force-quits whatever is still running.
+    /// Processes are matched by executable name, so another program in this bottle with the same
+    /// file name is stopped too.
+    func stopProgram(at url: URL) async {
+        let imageName = url.lastPathComponent
+        _ = try? await Wine.runWine(["taskkill.exe", "/IM", imageName], bottle: self)
 
-        let userStartMenu = url
-            .appending(path: "drive_c")
-            .appending(path: "users")
-            .appending(path: "crossover")
-            .appending(path: "AppData")
-            .appending(path: "Roaming")
-            .appending(path: "Microsoft")
-            .appending(path: "Windows")
-            .appending(path: "Start Menu")
-
-        var startMenuPrograms: [Program] = []
-        var linkURLs: [URL] = []
-        let globalEnumerator = FileManager.default.enumerator(at: globalStartMenu,
-                                                              includingPropertiesForKeys: [.isRegularFileKey],
-                                                              options: [.skipsHiddenFiles])
-        while let url = globalEnumerator?.nextObject() as? URL {
-            if url.pathExtension == "lnk" {
-                linkURLs.append(url)
-            }
+        for _ in 0..<10 {
+            try? await Task.sleep(for: .milliseconds(300))
+            let isRunning = await MainActor.run { runningPrograms.contains(url) }
+            guard isRunning else { return }
         }
 
-        let userEnumerator = FileManager.default.enumerator(at: userStartMenu,
+        _ = try? await Wine.runWine(["taskkill.exe", "/IM", imageName, "/F"], bottle: self)
+    }
+
+    /// Kill every instance of the program at `url` right away, for when it hangs. Skips the polite
+    /// close request. If Wine itself is stuck and `taskkill` can't get through, the program's
+    /// macOS processes are sent SIGKILL instead.
+    func forceStopProgram(at url: URL) async {
+        let imageName = url.lastPathComponent
+        let taskkill = Task.detached { [self] in
+            _ = try? await Wine.runWine(["taskkill.exe", "/IM", imageName, "/F"], bottle: self)
+        }
+
+        for _ in 0..<10 {
+            try? await Task.sleep(for: .milliseconds(300))
+            let isRunning = await MainActor.run { runningPrograms.contains(url) }
+            guard isRunning else { return }
+        }
+
+        taskkill.cancel()
+        Self.killUnixProcesses(runningImage: imageName)
+    }
+
+    /// SIGKILLs processes whose command line runs a Windows executable named `imageName`.
+    private static func killUnixProcesses(runningImage imageName: String) {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/ps")
+        process.arguments = ["-axww", "-o", "pid=,command="]
+        process.standardOutput = pipe
+        guard (try? process.run()) != nil else { return }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        guard let output = String(bytes: data, encoding: .utf8) else { return }
+
+        let needle = imageName.lowercased()
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        for line in output.split(separator: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard let space = trimmed.firstIndex(of: " "),
+                  let pid = Int32(trimmed[..<space]), pid != ownPID else { continue }
+            // Match the executable as a path component: `…\game.exe` or `…/game.exe`.
+            let command = trimmed[space...].lowercased()
+            let matches = command.contains("\\" + needle) || command.contains("/" + needle)
+                || command.trimmingCharacters(in: .whitespaces).hasPrefix(needle)
+            if matches {
+                kill(pid, SIGKILL)
+            }
+        }
+    }
+
+    /// Replaces a pin's default name (its file name) with the program's own name from its version
+    /// info, e.g. `cheatengine-x86_64` → "Cheat Engine". Names the user picked are left alone.
+    @MainActor
+    func adoptProductName(for url: URL) async {
+        let fileName = url.deletingPathExtension().lastPathComponent
+        func hasDefaultName() -> Bool {
+            settings.pins.contains { $0.url == url && $0.name.caseInsensitiveCompare(fileName) == .orderedSame }
+        }
+        guard hasDefaultName() else { return }
+        let name = await Task.detached(priority: .utility) {
+            (try? PEFile(url: url))?.productDisplayName
+        }.value
+        guard let name, hasDefaultName(),
+              let index = settings.pins.firstIndex(where: { $0.url == url }) else { return }
+        settings.pins[index].name = name
+    }
+
+    /// All `.lnk` files in the bottle's global and per-user Start Menus, sorted by name.
+    private func startMenuLinkURLs() -> [URL] {
+        let driveC = url.appending(path: "drive_c")
+        let startMenuPath = "Microsoft/Windows/Start Menu"
+
+        var startMenus = [driveC.appending(path: "ProgramData").appending(path: startMenuPath)]
+        // Engines name the Windows user differently (CrossOver uses `crossover`, others the Mac
+        // username), so look in every user's profile.
+        let usersFolder = driveC.appending(path: "users")
+        let users = (try? FileManager.default.contentsOfDirectory(at: usersFolder,
+                                                                  includingPropertiesForKeys: nil)) ?? []
+        for user in users {
+            startMenus.append(user.appending(path: "AppData/Roaming").appending(path: startMenuPath))
+        }
+
+        var linkURLs: [URL] = []
+        for startMenu in startMenus {
+            let enumerator = FileManager.default.enumerator(at: startMenu,
                                                             includingPropertiesForKeys: [.isRegularFileKey],
                                                             options: [.skipsHiddenFiles])
-        while let url = userEnumerator?.nextObject() as? URL {
-            if url.pathExtension == "lnk" {
-                linkURLs.append(url)
+            while let url = enumerator?.nextObject() as? URL {
+                if url.pathExtension == "lnk" {
+                    linkURLs.append(url)
+                }
             }
         }
 
-        linkURLs.sort(by: { $0.lastPathComponent.lowercased() < $1.lastPathComponent.lowercased() })
+        return linkURLs.sorted { $0.lastPathComponent.lowercased() < $1.lastPathComponent.lowercased() }
+    }
+
+    /// Start Menu shortcuts resolved to their target executables. Unlike `getStartMenuPrograms`
+    /// this is read-only: the `.lnk` files are left in place.
+    func startMenuShortcuts() -> [(name: String, url: URL)] {
+        var shortcuts: [(name: String, url: URL)] = []
+        for link in startMenuLinkURLs() {
+            guard let handle = try? FileHandle(forReadingFrom: link) else { continue }
+            defer { try? handle.close() }
+            guard let program = ShellLinkHeader.getProgram(url: link, handle: handle, bottle: self),
+                  !shortcuts.contains(where: { $0.url == program.url }) else { continue }
+            shortcuts.append((link.deletingPathExtension().lastPathComponent, program.url))
+        }
+        return shortcuts
+    }
+
+    @discardableResult
+    func getStartMenuPrograms() -> [Program] {
+        var startMenuPrograms: [Program] = []
+        let linkURLs = startMenuLinkURLs()
 
         for link in linkURLs {
             do {
