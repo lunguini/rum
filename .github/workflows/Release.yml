@@ -54,8 +54,10 @@ jobs:
         with:
           files: ${{ runner.temp }}/export/Rum.zip
           generate_release_notes: true
+          # v1 maintenance releases must never become the repository's "latest" release; that is v2.
+          make_latest: false
 
-      - name: Update Homebrew Cask
+      - name: Update Homebrew Cask (rum@1)
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
@@ -67,21 +69,23 @@ jobs:
 
           version, sha256, token = sys.argv[1], sys.argv[2], sys.argv[3]
           repo = "lunguini/homebrew-tap"
-          path = "Casks/rum.rb"
+          path = "Casks/rum@1.rb"
           api = f"https://api.github.com/repos/{repo}/contents/{path}"
           headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
 
-          cask = f'''cask "rum" do
+          cask = f'''cask "rum@1" do
           \tversion "{version}"
           \tsha256 "{sha256}"
 
-          \turl "https://github.com/adrianlungu/rum/releases/download/v#{{version}}/Rum.zip"
-          \tname "Rum"
+          \turl "https://github.com/lunguini/rum/releases/download/v#{{version}}/Rum.zip"
+          \tname "Rum (v1)"
           \tdesc "Wine wrapper for running Windows apps on macOS"
-          \thomepage "https://github.com/adrianlungu/rum"
+          \thomepage "https://github.com/lunguini/rum"
 
           \tdepends_on macos: ">= :sequoia"
           \tdepends_on arch: :arm64
+
+          \tconflicts_with cask: ["rum", "rum@2"]
 
           \tapp "Rum.app"
 
@@ -110,7 +114,7 @@ jobs:
 
           # Push updated cask (omit sha to create, include to update)
           content = base64.b64encode(cask.encode()).decode()
-          body = {"message": f"Update rum to {version}", "content": content}
+          body = {"message": f"Update rum@1 to {version}", "content": content}
           if file_sha:
               body["sha"] = file_sha
           payload = json.dumps(body).encode()

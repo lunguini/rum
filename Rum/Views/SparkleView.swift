@@ -17,6 +17,7 @@
 //
 
 import SwiftUI
+import SemanticVersion
 
 struct UpdateCheckView: View {
     @State private var isChecking = false
@@ -46,7 +47,13 @@ struct UpdateCheckView: View {
             return
         }
 
-        if latestVersion > currentVersion {
+        // Compared as versions, so 2.0.10 is newer than 2.0.9 and 2.0.0 newer than 2.0.0-beta.3.
+        let isNewer = if let latest = SemanticVersion(latestVersion), let current = SemanticVersion(currentVersion) {
+            latest > current
+        } else {
+            latestVersion.compare(currentVersion, options: .numeric) == .orderedDescending
+        }
+        if isNewer {
             showUpdateAvailable(latestVersion: latestVersion, releaseURL: releaseURL)
         } else {
             showAlert(
@@ -56,24 +63,37 @@ struct UpdateCheckView: View {
         }
     }
 
+    /// The newest release on this app's own major line (v1 never offers v2, and the other way
+    /// round). Betas are offered only to people already running a pre-release.
     private func fetchLatestRelease() async -> (String, URL)? {
         guard let url = URL(
-            string: "https://api.github.com/repos/adrianlungu/rum/releases/latest"
+            string: "https://api.github.com/repos/lunguini/rum/releases?per_page=50"
         ) else { return nil }
 
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
         guard let (data, _) = try? await URLSession.shared.data(for: request),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tagName = json["tag_name"] as? String,
-              let htmlURL = json["html_url"] as? String,
-              let releaseURL = URL(string: htmlURL) else {
+              let releases = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             return nil
         }
 
-        let version = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
-        return (version, releaseURL)
+        let current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        let currentMajor = current.split(separator: ".").first.map(String.init)
+        let includePrereleases = current.contains("-")
+
+        for release in releases {
+            guard let tagName = release["tag_name"] as? String,
+                  let htmlURL = release["html_url"] as? String,
+                  let releaseURL = URL(string: htmlURL),
+                  release["draft"] as? Bool != true else { continue }
+            if release["prerelease"] as? Bool == true && !includePrereleases { continue }
+            let version = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+            guard version.split(separator: ".").first.map(String.init) == currentMajor else { continue }
+            // GitHub lists releases newest first.
+            return (version, releaseURL)
+        }
+        return nil
     }
 
     @MainActor
