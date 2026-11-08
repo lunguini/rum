@@ -49,7 +49,7 @@ struct LibrarySidebar: View {
                 VStack(alignment: isCompact ? .center : .leading, spacing: 2) {
                     pageButton("Home", icon: "house", page: .home, count: runningCount)
                     pageButton("Games & Apps", icon: "square.grid.2x2", page: .library, count: libraryCount)
-                    pageButton("Recently Played", icon: "clock", page: .recent, count: recentCount)
+                    pageButton("History", icon: "clock", page: .recent, count: recentCount)
                     if foundCount > 0 {
                         pageButton("Found in Bottles", icon: "sparkle.magnifyingglass", page: .found,
                                    count: foundCount)

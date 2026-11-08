@@ -26,16 +26,11 @@ enum LibraryPage: Hashable {
         switch self {
         case .home: "Home"
         case .library: "Games & Apps"
-        case .recent: "Recently Played"
+        case .recent: "History"
         case .found: "Found in Bottles"
         case .settings: "Settings"
         }
     }
-}
-
-enum LibrarySort: String, CaseIterable {
-    case name = "Name"
-    case recent = "Recently Played"
 }
 
 /// The main window: a sidebar, the Library grid (or run history / suggestions), and a details
@@ -61,6 +56,8 @@ struct LibraryView: View {
     @State var renameItem: LibraryPinItem?
     @State var artworkItem: LibraryPinItem?
     @State var launchError: String?
+    @State var notice: LibraryNotice?
+    @State var reveal: LibraryReveal?
     @State private var isDropTargeted = false
     /// Bumped whenever any bottle publishes a change, so the aggregated lists re-render.
     @State private var changeCounter = 0
@@ -71,7 +68,7 @@ struct LibraryView: View {
                                                   maximum: LibraryCardMetrics.maxWidth),
                                         spacing: 16, alignment: .top)]
 
-    private var currentPage: LibraryPage { page ?? .home }
+    var currentPage: LibraryPage { page ?? .home }
 
     /// Pages showing program cards, which can be selected for the details panel.
     private var showsDetails: Bool { currentPage == .home || currentPage == .library }
@@ -153,11 +150,18 @@ struct LibraryView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .overlay(alignment: .bottom) {
-                if currentPage != .home {
+                if let notice {
+                    LibraryNoticeView(notice: notice)
+                        .task(id: notice.id) {
+                            try? await Task.sleep(for: .seconds(4))
+                            self.notice = nil
+                        }
+                } else if currentPage != .home {
                     LibraryLaunchToast(names: launchingNames)
                 }
             }
             .animation(.smooth(duration: 0.25), value: launchingNames)
+            .animation(.smooth(duration: 0.25), value: notice)
             .background(VisualEffectBackground().ignoresSafeArea())
             // The inspector hosts this column in its own container, which would bring back the
             // space the title bar reserved.
@@ -209,7 +213,7 @@ struct LibraryView: View {
 
     private var libraryPage: some View {
         let items = filteredPinnedItems
-        return ScrollView {
+        return ScrollViewReader { proxy in ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 pageHeader(count: items.count) {
                     Menu {
@@ -238,6 +242,7 @@ struct LibraryView: View {
                             selection = item.id
                             showsInspector = true
                         }
+                        .id(item.id)
                     }
                     if searchText.isEmpty {
                         LibraryAddCard(action: chooseAndAdd)
@@ -253,6 +258,12 @@ struct LibraryView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { selection = nil }
             }
+        }
+        // Brings a game into view when it's selected from elsewhere, e.g. a repeated drop.
+        .onAppear { if let selection { proxy.scrollTo(selection, anchor: .center) } }
+        .onChange(of: selection) { _, id in
+            if let id { withAnimation { proxy.scrollTo(id, anchor: .center) } }
+        }
         }
         .overlay {
             if items.isEmpty && !searchText.isEmpty {
@@ -304,6 +315,7 @@ extension LibraryView {
 
     private var homePage: some View {
         LibraryHomePage(running: runningItems,
+                        added: recentlyAddedItems,
                         favourites: favouriteItems,
                         recent: recentItems,
                         selection: selection,
@@ -313,7 +325,9 @@ extension LibraryView {
                             selection = item.id
                             showsInspector = true
                         },
-                        onSeeAllRecent: { page = .recent })
+                        onSeeAllRecent: { page = .recent },
+                        onSeeAllAdded: { sort = .added; page = .library },
+                        reveal: reveal)
         .acceptsProgramDrops(isTargeted: $isDropTargeted, perform: handleDrop)
     }
 

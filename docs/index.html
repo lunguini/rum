@@ -97,8 +97,8 @@
 
     /* Screenshot */
     .shot-section { padding-top: 0; border-top: 0; }
-    .shot { aspect-ratio: 1391 / 1045; width: 100%; border-radius: 20px; border: 1px solid var(--line-2); background: linear-gradient(160deg, var(--ink-2), #0a0c24); display: grid; place-items: center; color: var(--faint); font-size: 15px; overflow: hidden; box-shadow: 0 40px 90px -40px rgba(0,0,0,0.8); }
-    .shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+    .shot { aspect-ratio: 1200 / 932; width: 100%; border-radius: 20px; border: 1px solid var(--line-2); background: linear-gradient(160deg, var(--ink-2), #0a0c24); display: grid; place-items: center; color: var(--faint); font-size: 15px; overflow: hidden; box-shadow: 0 40px 90px -40px rgba(0,0,0,0.8); }
+    .shot img, .shot video { display: block; width: 100%; height: 100%; object-fit: cover; }
 
     /* Features */
     .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
@@ -205,8 +205,8 @@
 
   <section class="shot-section">
     <div class="wrap">
-      <!-- The app recording: save it as assets/demo.gif (about 1391×1045, or the same aspect ratio). -->
-      <div class="shot"><img src="assets/demo.gif" alt="Rum 2: adding a game to the library and launching it" onerror="this.replaceWith('A recording of the Rum 2 library goes here')"></div>
+      <!-- The app recording: assets/demo.mp4, made from the screen recording with ffmpeg (H.264, 1200px wide). -->
+      <div class="shot"><video src="assets/demo.mp4" poster="assets/demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Rum 2: adding a game to the library and launching it"></video></div>
     </div>
   </section>
 

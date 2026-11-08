@@ -365,7 +365,11 @@ struct WineManagerView: View {
                         activate: false
                     )
                 }
+                // Some builds install cleanly but can't start anything on this Mac; don't keep those.
+                let starts = await RumWineInstaller.engineStarts(release.id)
+                if !starts { try? RumWineInstaller.removeWineEngine(release.id) }
                 await load()
+                if !starts { errorMessage = "\(release.displayName) couldn't start on this Mac and was removed." }
             } catch {
                 errorMessage = error.localizedDescription
             }

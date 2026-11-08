@@ -124,6 +124,14 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
             }
 
             try await Wine.changeWinVersion(bottle: bottle, win: winVersion)
+            // wineboot failing leaves a prefix that looks fine but can't run anything.
+            guard RumWineInstaller.isPrefixInitialized(newBottleDir) else {
+                let engine = (try? RumWineInstaller.wineEngine(for: nil))?.displayName ?? "The Wine engine"
+                throw BottleCreationError(
+                    errorDescription: "\(engine) couldn't set up the bottle. "
+                        + "Choose another engine in Wine Manager and try again."
+                )
+            }
             let wineVer = try await Wine.wineVersion(bottle: bottle)
 
             await MainActor.run {
@@ -146,4 +154,8 @@ final class BottleVM: ObservableObject, @unchecked Sendable {
             throw error
         }
     }
+}
+
+struct BottleCreationError: LocalizedError {
+    let errorDescription: String?
 }

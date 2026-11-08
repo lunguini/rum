@@ -16,12 +16,15 @@
 //  If not, see https://www.gnu.org/licenses/.
 //
 
+import OSLog
 import SwiftUI
 import RumKit
 
-/// Home: what's running (or starting), what gets played most, and what was played last.
+/// Home: what's running (or starting), what gets played most, what was played last, and what was
+/// just added.
 struct LibraryHomePage: View {
     let running: [LibraryPinItem]
+    let added: [LibraryPinItem]
     let favourites: [LibraryPinItem]
     let recent: [LibraryPinItem]
     let selection: LibraryPinItem.ID?
@@ -29,12 +32,16 @@ struct LibraryHomePage: View {
     let actions: LibraryItemActions
     let onSelect: (LibraryPinItem) -> Void
     let onSeeAllRecent: () -> Void
+    let onSeeAllAdded: () -> Void
+    /// Set when something is added, to scroll it into view in Recently Added.
+    var reveal: LibraryReveal?
 
     private static var spacing: CGFloat { 16 }
     /// Cards in the rows have a fixed size, so the rows never widen the page.
     private static var cardWidth: CGFloat { 170 }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 runningSection
@@ -44,13 +51,27 @@ struct LibraryHomePage: View {
                 if !recent.isEmpty {
                     shelf("Recently Played", items: recent, onSeeAll: onSeeAllRecent)
                 }
+                if !added.isEmpty {
+                    shelf("Recently Added", items: added, reveal: reveal, onSeeAll: onSeeAllAdded)
+                        .id(Self.addedShelfID)
+                }
             }
             .padding(EdgeInsets(top: 10, leading: LibrarySidebarMetrics.margin,
                                 bottom: LibrarySidebarMetrics.margin, trailing: LibrarySidebarMetrics.margin))
         }
+        // The page scrolls to the shelf here, and the shelf scrolls to the card in `row`. One
+        // proxy can't reliably drive both. A new shelf or card only exists after this update, so
+        // wait for it to be laid out first.
+        .task(id: reveal) {
+            guard reveal != nil else { return }
+            try? await Task.sleep(for: .milliseconds(150))
+            Logger.wineKit.debug("Reveal: scrolling Home to Recently Added")
+            withAnimation { proxy.scrollTo(Self.addedShelfID, anchor: .bottom) }
+        }
+        }
         // Centred in the whole page, not just below the Running header, at any window size.
         .overlay {
-            if running.isEmpty && favourites.isEmpty && recent.isEmpty {
+            if running.isEmpty && added.isEmpty && favourites.isEmpty && recent.isEmpty {
                 ContentUnavailableView {
                     Label {
                         Text("Nothing Played Yet")
@@ -95,8 +116,10 @@ struct LibraryHomePage: View {
         .animation(.smooth(duration: 0.25), value: running.map(\.id))
     }
 
+    private static let addedShelfID = "recentlyAddedShelf"
+
     private func shelf(_ title: LocalizedStringKey, items: [LibraryPinItem], showsPlayCount: Bool = false,
-                       onSeeAll: (() -> Void)? = nil) -> some View {
+                       reveal: LibraryReveal? = nil, onSeeAll: (() -> Void)? = nil) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(title)
@@ -107,14 +130,17 @@ struct LibraryHomePage: View {
                         .buttonStyle(.link)
                 }
             }
-            row(items, showsPlayCount: showsPlayCount)
+            row(items, showsPlayCount: showsPlayCount, reveal: reveal)
         }
     }
 
     /// One row of cards that scrolls sideways when it doesn't fit, edge to edge across the page.
-    private func row(_ items: [LibraryPinItem], showsPlayCount: Bool = false) -> some View {
+    /// Shelves hold at most a dozen cards, so a plain HStack keeps every card around to scroll to.
+    private func row(_ items: [LibraryPinItem], showsPlayCount: Bool = false,
+                     reveal: LibraryReveal? = nil) -> some View {
+        ScrollViewReader { proxy in
         ScrollView(.horizontal) {
-            LazyHStack(alignment: .top, spacing: Self.spacing) {
+            HStack(alignment: .top, spacing: Self.spacing) {
                 ForEach(items) { item in
                     LibraryCard(bottle: item.bottle,
                                 item: item,
@@ -125,10 +151,17 @@ struct LibraryHomePage: View {
                         onSelect(item)
                     }
                     .frame(width: Self.cardWidth)
+                    .id(item.id)
                 }
             }
             // Room for the cards' hover shadow and scale, which the scroll view would clip.
             .padding(.vertical, 8)
+        }
+        .task(id: reveal) {
+            guard let reveal else { return }
+            try? await Task.sleep(for: .milliseconds(150))
+            withAnimation { proxy.scrollTo(reveal.itemID, anchor: .center) }
+        }
         }
         .scrollIndicators(.automatic)
         .contentMargins(.horizontal, LibrarySidebarMetrics.margin, for: .scrollContent)

@@ -33,7 +33,7 @@ private enum ArtworkSource: String, Codable {
     case steam
     /// An image the user picked.
     case custom
-    /// Nothing found. Looked up again after `ArtworkStore.retryInterval`.
+    /// Nothing found. Looked up again the next time Rum starts.
     case notFound
     /// The user removed the artwork; never looked up automatically again.
     case removed
@@ -56,7 +56,9 @@ final class ArtworkStore: ObservableObject {
     /// Bump when the lookup gets smarter, so programs it missed are tried again.
     private static let lookupVersion = 2
 
-    private static let retryInterval: TimeInterval = 7 * 24 * 60 * 60
+    /// Programs without a cover already looked up since Rum started. Each is tried once per
+    /// launch, so a game Steam lists later, or one looked up while offline, gets its cover then.
+    private var retriedThisLaunch: Set<URL> = []
 
     @Published private(set) var artwork: [URL: ProgramArtwork] = [:]
     @Published private(set) var lookingUp: Set<URL> = []
@@ -76,16 +78,16 @@ final class ArtworkStore: ObservableObject {
     }
 
     /// Loads cached artwork for `url`, looking it up on Steam the first time.
+    /// Loads cached artwork for `url`. A program without a cover is looked up on Steam once per
+    /// launch (unless the user removed its artwork); one with a cover is never looked up again.
     func load(for url: URL, name: String) async {
-        guard artwork[url] == nil, !lookingUp.contains(url) else { return }
-        let record = records[key(for: url)]
-        if let record {
+        guard !lookingUp.contains(url) else { return }
+        if artwork[url] == nil, records[key(for: url)] != nil {
             artwork[url] = await readFromDisk(url)
-            let shouldRetry = record.source == .notFound
-                && (record.updated.addingTimeInterval(Self.retryInterval) < Date()
-                    || (record.lookupVersion ?? 1) < Self.lookupVersion)
-            guard shouldRetry else { return }
         }
+        if let cached = artwork[url], !cached.isEmpty { return }
+        if records[key(for: url)]?.source == .removed { return }
+        guard retriedThisLaunch.insert(url).inserted else { return }
         await lookUp(url, name: name)
     }
 
@@ -151,7 +153,7 @@ final class ArtworkStore: ObservableObject {
             setRecord(Record(source: .notFound, updated: Date(), lookupVersion: Self.lookupVersion), for: url)
             artwork[url] = ProgramArtwork()
         case .offline:
-            // Try again next time the card appears.
+            // Steam couldn't be reached; nothing is recorded, so the next launch tries again.
             artwork[url] = ProgramArtwork()
         }
     }

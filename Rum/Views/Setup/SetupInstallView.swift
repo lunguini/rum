@@ -167,17 +167,19 @@ struct SetupInstallView: View {
     private func installEngine() async throws {
         switch plan.engine {
         case .sikarugir:
-            guard let release = await RumWineInstaller.fetchAvailableSikarugirReleases().first else {
-                throw SetupError("Couldn't reach the Sikarugir engine list. Check your connection and try again.")
-            }
-            let (tarball, _) = try await URLSession.shared.download(from: release.downloadURL)
-            try await RumWineInstaller.installSikarugirEngine(from: tarball, version: release.version, activate: true)
+            try await installFirstWorkingSikarugirEngine()
         case .gcenx:
             guard let release = await RumWineInstaller.fetchLatestRelease() else {
                 throw SetupError("Couldn't reach the Wine download list. Check your connection and try again.")
             }
             let (tarball, _) = try await URLSession.shared.download(from: release.downloadURL)
-            try await RumWineInstaller.install(from: tarball, version: release.version, activate: true)
+            try await RumWineInstaller.install(from: tarball, version: release.version, activate: false)
+            let id = WineEngine.managedID(kind: .gcenx, version: release.version)
+            guard await RumWineInstaller.engineStarts(id) else {
+                throw SetupError("Wine \(release.version) installed but couldn't start on this Mac. "
+                    + "Try the Sikarugir engine instead.")
+            }
+            try RumWineInstaller.activateWineEngine(id)
         case .external(let choice):
             let engine = switch choice.kind {
             case .crossOver: try RumWineInstaller.importCrossOverEngine(at: choice.appURL)
@@ -185,6 +187,36 @@ struct SetupInstallView: View {
             }
             try RumWineInstaller.activateExternalWineEngine(engine.id)
         }
+    }
+
+    /// Install the newest Sikarugir engine that actually starts on this Mac. A brand-new Wine line
+    /// can install cleanly yet fail to launch anything, so try the newest build of each Wine
+    /// version in turn and remove the ones that don't start.
+    private func installFirstWorkingSikarugirEngine() async throws {
+        let releases = await RumWineInstaller.fetchAvailableSikarugirReleases()
+            .filter { $0.version.hasPrefix("WS12") && !$0.version.lowercased().contains("battle") }
+        guard !releases.isEmpty else {
+            throw SetupError("Couldn't reach the Sikarugir engine list. Check your connection and try again.")
+        }
+        // Newest build per Wine version ("WS12WineSikarugir11.0_1" → "11"), newest version first.
+        var seenLines = Set<String>()
+        let candidates = releases.filter { release in
+            let line = release.version.replacingOccurrences(of: "WS12WineSikarugir", with: "")
+                .split(separator: ".").first.map(String.init) ?? release.version
+            return seenLines.insert(line).inserted
+        }.prefix(3)
+
+        for release in candidates {
+            let (tarball, _) = try await URLSession.shared.download(from: release.downloadURL)
+            try await RumWineInstaller.installSikarugirEngine(from: tarball, version: release.version, activate: false)
+            if await RumWineInstaller.engineStarts(release.id) {
+                try RumWineInstaller.activateWineEngine(release.id)
+                return
+            }
+            try? RumWineInstaller.removeWineEngine(release.id)
+        }
+        throw SetupError("None of the recent Sikarugir engines could start on this Mac. "
+            + "Try Advanced setup with the Gcenx engine.")
     }
 
     @ViewBuilder

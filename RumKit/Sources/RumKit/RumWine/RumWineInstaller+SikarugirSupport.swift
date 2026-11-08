@@ -54,6 +54,14 @@ extension RumWineInstaller {
             }
     }
 
+    /// Whether Rum's own template copy is `version` or newer. Templates Rum didn't install (the
+    /// Sikarugir app's) don't count, since Rum can't tell or update their version.
+    static func hasManagedSikarugirTemplate(atLeast version: String, in libraryFolder: URL) -> Bool {
+        guard let installed = managedSikarugirTemplateFrameworksURL(in: libraryFolder)?
+            .deletingLastPathComponent().lastPathComponent else { return false }
+        return installed.localizedStandardCompare(version) != .orderedAscending
+    }
+
     private static func managedSikarugirTemplateFrameworksURL(in libraryFolder: URL) -> URL? {
         let supportFolder = libraryFolder.appending(path: sikarugirSupportFolderName)
         guard let versions = try? FileManager.default.contentsOfDirectory(
