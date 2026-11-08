@@ -62,7 +62,7 @@
     nav .links { display: flex; align-items: center; gap: 28px; font: 500 14.5px var(--body); }
     nav .links a { color: var(--muted); }
     nav .links a:hover { color: var(--text); text-decoration: none; }
-    nav .links .gh { color: var(--text); padding: 7px 14px; border: 1px solid var(--line-2); border-radius: 999px; }
+    nav .links .gh { color: var(--text); padding: 7px 14px; line-height: 1.5; border: 1px solid var(--line-2); border-radius: 999px; }
 
     /* Hero */
     .hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 56px; align-items: center; padding: 64px 0 96px; }
@@ -103,7 +103,12 @@
     /* Features */
     .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
     .card { padding: 28px; border-radius: var(--radius); border: 1px solid var(--line); background: rgba(255,255,255,0.025); }
-    .card .ico { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; font-size: 20px; background: var(--brew); margin-bottom: 20px; }
+    .card .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--brew); margin-bottom: 20px;
+      /* Inner shadow + rim light make the tile read as a raised plate the icon is cut out of. */
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -2px 4px rgba(0,0,0,0.25), 0 6px 18px -8px rgba(240,40,122,0.6); }
+    .card .ico svg { width: 24px; height: 24px; fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+      /* A light edge under the dark stroke, like the lip of an engraved cut. */
+      filter: drop-shadow(0 1px 0 rgba(255,255,255,0.45)) drop-shadow(0 -1px 0 rgba(0,0,0,0.25)); }
     .card h3 { font-size: 20px; letter-spacing: -0.01em; margin-bottom: 8px; }
     .card p { color: var(--muted); font-size: 15.5px; }
 
@@ -141,6 +146,16 @@
     .credits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; padding: 0; margin: 0; list-style: none; }
     .credits li { padding: 12px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 15.5px; }
     .credits a { color: var(--text); font-weight: 600; }
+    /* Split button in the nav: each half links to its own place, like GitHub's Sponsor button. */
+    nav .links .duo { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; overflow: hidden; }
+    nav .links .duo a { color: var(--text); padding: 7px 14px; line-height: 1.5; }
+    nav .links .duo a + a { border-left: 1px solid var(--line-2); }
+    nav .links .duo a:hover { background: rgba(255,255,255,0.06); }
+    nav .links .duo .heart { color: var(--pink); }
+    .support { margin-top: 48px; padding: 28px; border-radius: var(--radius); border: 1px solid var(--line); background: rgba(255,255,255,0.025); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+    .support h3 { font-size: 20px; margin-bottom: 4px; }
+    .support p { margin: 0; color: var(--muted); font-size: 15.5px; }
+    .support .btns { display: flex; gap: 10px; flex-wrap: wrap; }
     footer { padding: 36px 0 56px; border-top: 1px solid var(--line); color: var(--faint); font-size: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
     footer a { color: var(--muted); }
 
@@ -163,6 +178,9 @@
         <a href="#features">Features</a>
         <a href="#compare">Rum vs Whisky</a>
         <a href="#install">Install</a>
+        <span class="duo" role="group" aria-label="Back Rum">
+          <a href="https://github.com/sponsors/lunguini"><span class="heart">♥</span> Sponsor</a><a href="https://ko-fi.com/adyjay">☕ Coffee</a>
+        </span>
         <a class="gh" href="https://github.com/lunguini/rum">GitHub ↗</a>
       </div>
     </nav>
@@ -187,9 +205,8 @@
 
   <section class="shot-section">
     <div class="wrap">
-      <!-- To add the screenshot, save it as assets/library.png and replace this div's contents with:
-           <img src="assets/library.png" alt="The Rum 2 game library"> -->
-      <div class="shot">Screenshot of the Rum 2 library goes here</div>
+      <!-- The app recording: save it as assets/demo.gif (about 1391×1045, or the same aspect ratio). -->
+      <div class="shot"><img src="assets/demo.gif" alt="Rum 2: adding a game to the library and launching it" onerror="this.replaceWith('A recording of the Rum 2 library goes here')"></div>
     </div>
   </section>
 
@@ -199,12 +216,12 @@
       <h2>Wine, but a bit sweeter.</h2>
       <p class="sub">Rum wraps Wine in a native SwiftUI app, so you spend your time playing instead of editing prefixes.</p>
       <div class="grid">
-        <div class="card"><div class="ico">🎮</div><h3>A real game library</h3><p>Cover art, play time, Recently Played and one-click launch for every game and app you add.</p></div>
-        <div class="card"><div class="ico">⚡</div><h3>Modern graphics</h3><p>DXVK, DXMT, WineD3D and D3DMetal, with Rum checking the renderer before launch instead of after a crash.</p></div>
-        <div class="card"><div class="ico">🍾</div><h3>Bottles made easy</h3><p>Create and manage Wine bottles without the terminal. Winetricks, environment and runtime settings are built in.</p></div>
-        <div class="card"><div class="ico">🧪</div><h3>Multiple Wine engines</h3><p>Keep Gcenx and Sikarugir engines side by side and pin a different one to each bottle.</p></div>
-        <div class="card"><div class="ico">🎛️</div><h3>Per-game graphics</h3><p>Run one game on DXMT and another on DXVK in the same bottle, and switch from the library when one misbehaves.</p></div>
-        <div class="card"><div class="ico">💻</div><h3>Command line too</h3><p>The <code>rum</code> CLI lists, creates and runs bottles for scripting and shell setups.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-4 3.6l-.6 5.6A3 3 0 0 0 5.1 17.5c1 0 1.9-.5 2.4-1.3L9 14h6l1.5 2.2c.5.8 1.4 1.3 2.4 1.3a3 3 0 0 0 3-3.3l-.6-5.6A4 4 0 0 0 17.3 5Z"/></svg></div><h3>A real game library</h3><p>Cover art, play time, Recently Played and one-click launch for every game and app you add.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg></div><h3>Modern graphics</h3><p>DXVK, DXMT, WineD3D and D3DMetal, with Rum checking the renderer before launch instead of after a crash.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2h4M10.5 2v4.5L8 10v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V10l-2.5-3.5V2"/><path d="M8 14h8"/></svg></div><h3>Bottles made easy</h3><p>Create and manage Wine bottles without the terminal. Winetricks, environment and runtime settings are built in.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2h6M10 2v6.5L4.6 18.2A2.5 2.5 0 0 0 6.8 22h10.4a2.5 2.5 0 0 0 2.2-3.8L14 8.5V2"/><path d="M7 15h10"/></svg></div><h3>Multiple Wine engines</h3><p>Keep Gcenx and Sikarugir engines side by side and pin a different one to each bottle.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></div><h3>Per-game graphics</h3><p>Run one game on DXMT and another on DXVK in the same bottle, and switch from the library when one misbehaves.</p></div>
+        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17 6-5-6-5M12 19h8"/></svg></div><h3>Command line too</h3><p>The <code>rum</code> CLI lists, creates and runs bottles for scripting and shell setups.</p></div>
       </div>
     </div>
   </section>
@@ -288,13 +305,23 @@
         <li><a href="https://github.com/sparkle-project/Sparkle">Sparkle</a> by sparkle-project</li>
         <li><a href="https://www.winehq.org">WineHQ</a> and <a href="https://www.codeweavers.com">CodeWeavers</a></li>
       </ul>
+      <div class="support" id="sponsor">
+        <div>
+          <h3>Enjoying Rum?</h3>
+          <p>Rum is free and open source. If it saved you an evening, you can help keep it going.<br>The Wine and DXVK builds come from <a href="https://ko-fi.com/gcenx">Gcenx</a>, who welcomes support too.</p>
+        </div>
+        <div class="btns">
+          <a class="btn primary" href="https://github.com/sponsors/lunguini">♥ Sponsor on GitHub</a>
+          <a class="btn" href="https://ko-fi.com/adyjay">☕ Buy me a coffee</a>
+        </div>
+      </div>
     </div>
   </section>
 
   <div class="wrap">
     <footer>
       <span>Rum is free software under the GPL-3.0 license.</span>
-      <span><a href="https://github.com/lunguini/rum">GitHub</a> · <a href="https://github.com/lunguini/rum/releases">Releases</a> · <a href="https://github.com/lunguini/rum/issues">Report an issue</a></span>
+      <span><a href="https://github.com/lunguini/rum">GitHub</a> · <a href="https://github.com/lunguini/rum/releases">Releases</a> · <a href="https://github.com/lunguini/rum/issues">Report an issue</a> · <a href="https://github.com/sponsors/lunguini">Sponsor</a> · <a href="https://ko-fi.com/adyjay">Ko-fi</a></span>
     </footer>
   </div>
 
