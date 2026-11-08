@@ -60,6 +60,10 @@ Download the latest `Rum.zip` from the [Releases](https://github.com/lunguini/ru
 - CPU: Apple Silicon (M-series chips)
 - OS: macOS Tahoe 26.0 or later
 
+## Sponsoring
+
+Rum is free and open source. If it's useful to you, you can back it through [GitHub Sponsors](https://github.com/sponsors/lunguini) or [Ko-fi](https://ko-fi.com/adyjay). The Wine and DXVK builds Rum installs come from [Gcenx](https://ko-fi.com/gcenx), who welcomes support too.
+
 ## Credits & Acknowledgments
 
 Rum is possible thanks to the magic of several projects:

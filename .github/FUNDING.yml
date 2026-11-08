@@ -1,4 +1,5 @@
-# These are supported funding model platforms
-
-ko_fi: isaacmarovitz
-custom: ["https://ko-fi.com/gcenx", "https://www.codeweavers.com/store?ad=1010"]
+# Shown as the "Sponsor" button on the repository.
+github: lunguini
+ko_fi: adyjay
+# Gcenx builds the Wine and DXVK packages Rum installs.
+custom: ["https://ko-fi.com/gcenx"]
