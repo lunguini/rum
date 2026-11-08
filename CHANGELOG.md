@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2
+
+### Improvements
+
+- Rum 1 now only offers Rum 1 updates, so it won't upgrade itself to Rum 2. Rum 2 can be installed alongside it with Homebrew (`rum`), while Rum 1 stays available as `rum@1`
+
 ## 1.2.1
 
 ### Fixes
