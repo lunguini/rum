@@ -16,6 +16,7 @@
 //  If not, see https://www.gnu.org/licenses/.
 //
 
+import CryptoKit
 import SwiftUI
 import RumKit
 
@@ -160,11 +161,16 @@ extension View {
 
 // MARK: - Icons
 
-/// Icons read from executables, shared by every view that shows them.
+/// Icons read from executables, shared by every view that shows them. Kept on disk too, so icons
+/// show instantly on later launches instead of waiting to be read out of each executable.
 @MainActor
 enum ExeIconCache {
     private static var icons: [URL: NSImage] = [:]
     private static var missing: Set<URL> = []
+    /// Reads in progress, so a card's icon and its backdrop share one read.
+    private static var loading: [URL: Task<NSImage?, Never>] = [:]
+    private static let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        .appending(path: "ProgramIcons")
 
     static func cached(_ url: URL) -> NSImage? {
         icons[url]
@@ -178,16 +184,40 @@ enum ExeIconCache {
     static func load(_ url: URL) async -> NSImage? {
         if let icon = icons[url] { return icon }
         if missing.contains(url) { return nil }
-        // NSImage isn't Sendable; carry the pixels across instead.
-        let data = await Task.detached(priority: .utility) {
-            (try? PEFile(url: url))?.bestIcon()?.tiffRepresentation
-        }.value
-        guard let data, let icon = NSImage(data: data) else {
-            missing.insert(url)
-            return nil
+        if let task = loading[url] { return await task.value }
+
+        let cacheFile = folder.appending(path: cacheName(for: url))
+        let task = Task<NSImage?, Never> {
+            // NSImage isn't Sendable; carry the pixels across instead. User-initiated, so icons
+            // aren't queued behind background work such as artwork lookups.
+            let data = await Task.detached(priority: .userInitiated) { () -> Data? in
+                if let cached = try? Data(contentsOf: cacheFile) { return cached }
+                guard let image = (try? PEFile(url: url))?.bestIcon(),
+                      let tiff = image.tiffRepresentation,
+                      let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
+                    return nil
+                }
+                try? FileManager.default.createDirectory(at: cacheFile.deletingLastPathComponent(),
+                                                         withIntermediateDirectories: true)
+                try? png.write(to: cacheFile, options: .atomic)
+                return png
+            }.value
+            return data.flatMap(NSImage.init(data:))
         }
-        icons[url] = icon
+        loading[url] = task
+        let icon = await task.value
+        loading[url] = nil
+        if let icon { icons[url] = icon } else { missing.insert(url) }
         return icon
+    }
+
+    /// One file per executable path and version: a changed executable gets its icon read again.
+    private static func cacheName(for url: URL) -> String {
+        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate?.timeIntervalSince1970 ?? 0
+        let key = "\(url.path(percentEncoded: false))|\(modified)"
+        let digest = SHA256.hash(data: Data(key.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined() + ".png"
     }
 }
 

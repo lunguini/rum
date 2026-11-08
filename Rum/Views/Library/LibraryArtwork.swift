@@ -53,6 +53,8 @@ struct ArtworkView: View {
         }
         .animation(.easeOut(duration: 0.2), value: image != nil)
         .task(id: url) {
+            // The icon first, so the card is never blank while Steam is being asked for artwork.
+            _ = await ExeIconCache.load(url)
             await store.load(for: url, name: name)
         }
     }

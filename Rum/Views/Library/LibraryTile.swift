@@ -351,7 +351,7 @@ struct LibraryItemMenu: View {
         }
     }
 
-    /// Run before: it shows in Home and Recently Played.
+    /// Run before: it shows in Home and History.
     private var isInHistory: Bool {
         item.bottle.settings.runHistory.contains { $0.url == item.url }
     }

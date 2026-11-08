@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.0.0-beta.1
+
+### New Features
+
+- Guided setup that installs a Wine engine and checks it actually starts, falling back to another build if it doesn't
+- Drag and drop `.exe` and `.bat` files onto the library, with a notice when a file can't be added or is already there
+- Recently Added shelf on Home and a matching sort option in Games & Apps
+- The drawer's Recently Played is now History
+
+### Improvements
+
+- Program icons show immediately and are cached on disk, instead of waiting for Steam artwork
+- Missing covers are retried once per launch
+- Engines installed from Wine Manager are checked and removed if they can't start
+- Bottle creation reports an error when the prefix wasn't set up
+- Always uses the latest Sikarugir template
+
+### Fixes
+
+- Retina Mode no longer shows N/A when the setting has never been changed
+- Play and pin icons in History are readable in dark mode
+
 ## 2.0.0-alpha.1
 
 ### Preview

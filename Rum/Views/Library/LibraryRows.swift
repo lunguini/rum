@@ -77,13 +77,14 @@ struct LibraryRecentRow: View {
                     togglePin()
                 } label: {
                     Image(systemName: isPinned ? "pin.fill" : "pin")
-                        .foregroundStyle(isPinned ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                        // The accent colour is near-black, which disappears on the dark rows.
+                        .foregroundStyle(isPinned ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                         .frame(width: 24, height: 24)
                 }
                 .help(isPinned ? "Remove from Library" : "Add to Library")
                 Button(action: onRun) {
                     Image(systemName: "play.fill")
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(.primary)
                         .frame(width: 24, height: 24)
                 }
                 .disabled(isMissing)

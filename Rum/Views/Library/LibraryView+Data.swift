@@ -21,6 +21,12 @@ import SwiftUI
 import UniformTypeIdentifiers
 import RumKit
 
+enum LibrarySort: String, CaseIterable {
+    case name = "Name"
+    case recent = "Recently Played"
+    case added = "Recently Added"
+}
+
 // MARK: - Data
 
 extension LibraryView {
@@ -71,6 +77,8 @@ extension LibraryView {
                 case (nil, nil): return lhs.pin.name.localizedStandardCompare(rhs.pin.name) == .orderedAscending
                 }
             }
+        case .added:
+            return items.sorted { $0.addedDate > $1.addedDate }
         }
     }
 
@@ -118,6 +126,17 @@ extension LibraryView {
             }
             .prefix(12)
             .map { item(for: $0.entry.url, name: $0.entry.name, in: $0.bottle) }
+    }
+
+    /// Added to the Library in the last month, newest first, so a new game or app shows up on
+    /// Home straight away instead of only on the Games & Apps page.
+    var recentlyAddedItems: [LibraryPinItem] {
+        let cutoff = Date().addingTimeInterval(-30 * 24 * 60 * 60)
+        return pinnedItems
+            .filter { $0.addedDate > cutoff && matchesSearch($0.pin.name) }
+            .sorted { $0.addedDate > $1.addedDate }
+            .prefix(12)
+            .map { $0 }
     }
 
     var recentItems: [LibraryPinItem] {
@@ -231,13 +250,7 @@ extension LibraryView {
         dismissedSuggestionsRaw = dismissed.sorted().joined(separator: "\n")
     }
 
-    func pin(_ url: URL, name: String, in bottle: Bottle) {
-        guard !bottle.settings.pins.contains(where: { $0.url == url }) else { return }
-        bottle.settings.pins.append(PinnedProgram(name: name, url: url))
-        selection = LibraryPinItem.id(bottle: bottle, url: url)
-    }
-
-    /// Runs any program, installer or batch file. It shows up in Recently Played.
+    /// Runs any program, installer or batch file. It shows up in History.
     func chooseAndRun() {
         guard let bottle = defaultBottle else { return }
         choose(allowing: [UTType.exe,
@@ -296,23 +309,6 @@ extension LibraryView {
                                                     winVersion: .win10,
                                                     architecture: .win64,
                                                     bottleURL: location)
-    }
-
-    func handleDrop(providers: [NSItemProvider]) -> Bool {
-        guard let bottle = defaultBottle else { return false }
-        // Finder's providers often have no `suggestedName`, or one without the extension, so
-        // the file type can only be checked once the URL is loaded.
-        let fileProviders = providers.filter { $0.canLoadObject(ofClass: URL.self) }
-        for provider in fileProviders {
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url, url.isFileURL,
-                      Self.runnableExtensions.contains(url.pathExtension.lowercased()) else { return }
-                Task { @MainActor in
-                    pin(url, name: url.deletingPathExtension().lastPathComponent, in: bottle)
-                }
-            }
-        }
-        return !fileProviders.isEmpty
     }
 }
 

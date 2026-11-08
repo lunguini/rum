@@ -82,18 +82,21 @@ extension RumWineInstaller {
         activate: Bool = false,
         in libraryFolder: URL = RumWineInstaller.libraryFolder
     ) async throws {
-        if sikarugirTemplateFrameworksURL(for: libraryFolder) == nil {
-            guard let templateRelease = await fetchLatestSikarugirTemplateRelease() else {
-                throw WineManagerError.sikarugirSupportNotInstalled
-            }
+        // Newer engines can need newer support libraries than an old template provides (Wine 11
+        // builds die on start with template 1.0.5), so keep Rum's own copy at the latest template
+        // rather than settling for any template already on disk.
+        let latestTemplate = await fetchLatestSikarugirTemplateRelease()
+        if let latestTemplate, !hasManagedSikarugirTemplate(atLeast: latestTemplate.version, in: libraryFolder) {
             let (templateTarball, _) = try await URLSession.shared.download(
-                from: templateRelease.downloadURL
+                from: latestTemplate.downloadURL
             )
             try await installSikarugirSupport(
                 from: templateTarball,
-                version: templateRelease.version,
+                version: latestTemplate.version,
                 in: libraryFolder
             )
+        } else if latestTemplate == nil, sikarugirTemplateFrameworksURL(for: libraryFolder) == nil {
+            throw WineManagerError.sikarugirSupportNotInstalled
         }
 
         try await install(
