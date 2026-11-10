@@ -99,7 +99,7 @@ final class WinePrefixStateTests: XCTestCase {
 
 @MainActor
 final class WineEnginePinningTests: XCTestCase {
-    private var bottleURL: URL!
+    nonisolated(unsafe) private var bottleURL: URL!
 
     override func setUpWithError() throws {
         try super.setUpWithError()
